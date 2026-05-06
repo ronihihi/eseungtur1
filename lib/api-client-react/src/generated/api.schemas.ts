@@ -109,6 +109,8 @@ export interface Recipient {
   signedAt?: string | null;
   viewedAt?: string | null;
   signerName?: string | null;
+  /** Base64-encoded signature image (present when signed) */
+  signatureData?: string | null;
   createdAt: string;
 }
 

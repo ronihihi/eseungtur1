@@ -84,8 +84,8 @@ export function SignPage() {
   const recipientFields = data?.fields ?? [];
   const isPdf = data?.documentFilename?.toLowerCase().endsWith(".pdf") ?? true;
 
-  // Signature image to display when completed — prefer just-submitted, fall back to stored
-  const completedSig = submittedSig || (data?.recipient as { signatureData?: string })?.signatureData || "";
+  // Signature image to display when completed — prefer just-submitted, fall back to stored in DB
+  const completedSig = submittedSig || data?.recipient?.signatureData || "";
 
   const renderSigningOverlay = () => (
     <>
@@ -207,11 +207,13 @@ export function SignPage() {
           </Alert>
 
           {isPdf ? (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                Your signature is shown at the highlighted location below
-              </p>
+            <div className="space-y-4">
+              {recipientFields.length > 0 && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                  Your signature is shown at the highlighted location below
+                </p>
+              )}
               <PdfViewer
                 fileUrl={`/api/sign/${token}/file`}
                 currentPage={currentPage}
@@ -220,6 +222,23 @@ export function SignPage() {
                 onPageChange={setCurrentPage}
                 renderOverlay={recipientFields.length > 0 ? renderCompletedOverlay : undefined}
               />
+              {/* When no field was placed, show signature beneath the PDF */}
+              {recipientFields.length === 0 && completedSig && (
+                <div className="rounded-xl border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900/40 p-4 space-y-2">
+                  <p className="text-xs font-semibold text-green-700 dark:text-green-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Signature recorded for this document
+                  </p>
+                  <div className="bg-white dark:bg-black/20 rounded-lg border p-3 flex items-center justify-center">
+                    <img src={completedSig} alt="Your signature" className="max-h-20 object-contain" />
+                  </div>
+                  {data.recipient.signerName && (
+                    <p className="text-xs text-green-700 dark:text-green-500">
+                      Signed by <strong>{data.recipient.signerName}</strong>
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <Card className="border-dashed">

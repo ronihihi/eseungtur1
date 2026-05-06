@@ -166,6 +166,10 @@ export const GetDocumentResponse = zod.object({
       signedAt: zod.string().nullish(),
       viewedAt: zod.string().nullish(),
       signerName: zod.string().nullish(),
+      signatureData: zod
+        .string()
+        .nullish()
+        .describe("Base64-encoded signature image (present when signed)"),
       createdAt: zod.string(),
     }),
   ),
@@ -301,6 +305,10 @@ export const GetDocumentStatusResponse = zod.object({
       signedAt: zod.string().nullish(),
       viewedAt: zod.string().nullish(),
       signerName: zod.string().nullish(),
+      signatureData: zod
+        .string()
+        .nullish()
+        .describe("Base64-encoded signature image (present when signed)"),
       createdAt: zod.string(),
     }),
   ),
@@ -337,6 +345,10 @@ export const GetSigningInfoResponse = zod.object({
     signedAt: zod.string().nullish(),
     viewedAt: zod.string().nullish(),
     signerName: zod.string().nullish(),
+    signatureData: zod
+      .string()
+      .nullish()
+      .describe("Base64-encoded signature image (present when signed)"),
     createdAt: zod.string(),
   }),
   documentTitle: zod.string(),
