@@ -423,6 +423,24 @@ export const DeleteAdminUserResponse = zod.object({
 });
 
 /**
+ * @summary Get audit log of all document and signing events (admin only)
+ */
+export const GetAdminAuditLogResponse = zod.object({
+  events: zod.array(
+    zod.object({
+      id: zod.string(),
+      type: zod.enum(["uploaded", "sent", "viewed", "signed", "completed"]),
+      documentId: zod.string(),
+      documentTitle: zod.string(),
+      actorName: zod.string().nullable(),
+      actorEmail: zod.string().nullable(),
+      ipAddress: zod.string().nullable(),
+      timestamp: zod.string(),
+    }),
+  ),
+});
+
+/**
  * @summary Update a user's role (admin only)
  */
 export const UpdateAdminUserRoleParams = zod.object({

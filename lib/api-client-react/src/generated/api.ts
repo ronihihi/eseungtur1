@@ -18,6 +18,7 @@ import type {
 
 import type {
   AdminUserListResponse,
+  AuditLogResponse,
   AuthResponse,
   AzureEnabledResponse,
   CreateUserRequest,
@@ -1957,6 +1958,81 @@ export const useDeleteAdminUser = <
 > => {
   return useMutation(getDeleteAdminUserMutationOptions(options));
 };
+
+/**
+ * @summary Get audit log of all document and signing events (admin only)
+ */
+export const getGetAdminAuditLogUrl = () => {
+  return `/api/admin/audit`;
+};
+
+export const getAdminAuditLog = async (
+  options?: RequestInit,
+): Promise<AuditLogResponse> => {
+  return customFetch<AuditLogResponse>(getGetAdminAuditLogUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAdminAuditLogQueryKey = () => {
+  return [`/api/admin/audit`] as const;
+};
+
+export const getGetAdminAuditLogQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminAuditLog>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminAuditLog>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAdminAuditLogQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminAuditLog>>
+  > = ({ signal }) => getAdminAuditLog({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminAuditLog>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminAuditLogQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminAuditLog>>
+>;
+export type GetAdminAuditLogQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get audit log of all document and signing events (admin only)
+ */
+
+export function useGetAdminAuditLog<
+  TData = Awaited<ReturnType<typeof getAdminAuditLog>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminAuditLog>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminAuditLogQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Update a user's role (admin only)

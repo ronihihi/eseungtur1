@@ -257,6 +257,32 @@ export interface UpdateRoleRequest {
   role: UpdateRoleRequestRole;
 }
 
+export type AuditEventType =
+  (typeof AuditEventType)[keyof typeof AuditEventType];
+
+export const AuditEventType = {
+  uploaded: "uploaded",
+  sent: "sent",
+  viewed: "viewed",
+  signed: "signed",
+  completed: "completed",
+} as const;
+
+export interface AuditEvent {
+  id: string;
+  type: AuditEventType;
+  documentId: string;
+  documentTitle: string;
+  actorName: string | null;
+  actorEmail: string | null;
+  ipAddress: string | null;
+  timestamp: string;
+}
+
+export interface AuditLogResponse {
+  events: AuditEvent[];
+}
+
 export type UploadDocumentBodySigningOrder =
   (typeof UploadDocumentBodySigningOrder)[keyof typeof UploadDocumentBodySigningOrder];
 

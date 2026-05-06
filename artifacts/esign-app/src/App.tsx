@@ -13,6 +13,7 @@ import { UploadPage } from "@/pages/upload";
 import { DocumentDetailPage } from "@/pages/document-detail";
 import { SignPage } from "@/pages/sign";
 import { AdminUsersPage } from "@/pages/admin-users";
+import { AdminAuditPage } from "@/pages/admin-audit";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -93,6 +94,9 @@ function Router() {
       </Route>
       <Route path="/admin/users">
         <AdminRoute component={AdminUsersPage} />
+      </Route>
+      <Route path="/admin/audit">
+        <AdminRoute component={AdminAuditPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

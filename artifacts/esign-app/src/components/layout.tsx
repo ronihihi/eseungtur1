@@ -1,6 +1,6 @@
 import { useLogout, useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
-import { LogOut, FileSignature, LayoutDashboard, Plus, PenLine, Users } from "lucide-react";
+import { LogOut, FileSignature, LayoutDashboard, Plus, PenLine, Users, ClipboardList } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -67,6 +67,17 @@ export function Layout({ children }: LayoutProps) {
               >
                 <Users className="h-4 w-4" />
                 Users
+              </Link>
+            )}
+            {isAdmin && (
+              <Link
+                href="/admin/audit"
+                className={`flex items-center gap-2 text-sm font-medium transition-colors ${
+                  location === "/admin/audit" ? "text-primary" : "text-muted-foreground hover:text-primary"
+                }`}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Audit Log
               </Link>
             )}
           </nav>
