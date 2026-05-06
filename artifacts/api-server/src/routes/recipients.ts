@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { eq, and } from "drizzle-orm";
-import { db, documentsTable, recipientsTable } from "@workspace/db";
+import { db, documentsTable, recipientsTable, signatureFieldsTable } from "@workspace/db";
 import { SetRecipientsBody } from "@workspace/api-zod";
 import type { Request, Response } from "express";
 import { sendSigningEmail } from "./emailService.js";
@@ -36,11 +36,25 @@ router.post("/documents/:id/recipients", requireAuth, async (req: Request, res: 
       return;
     }
 
-    await db.delete(recipientsTable).where(eq(recipientsTable.documentId, id));
+    const existing = await db
+      .select()
+      .from(recipientsTable)
+      .where(eq(recipientsTable.documentId, id));
+    existing.sort((a, b) => a.signOrder - b.signOrder);
 
-    await Promise.all(
-      parsed.data.recipients.map((r, i) =>
-        db.insert(recipientsTable).values({
+    const newList = parsed.data.recipients;
+
+    // Update existing recipients in place (preserves IDs → field references stay valid)
+    for (let i = 0; i < newList.length; i++) {
+      const r = newList[i];
+      const existingRec = existing[i];
+      if (existingRec) {
+        await db
+          .update(recipientsTable)
+          .set({ teamName: r.teamName, email: r.email, signOrder: i + 1 })
+          .where(eq(recipientsTable.id, existingRec.id));
+      } else {
+        await db.insert(recipientsTable).values({
           id: uuidv4(),
           documentId: id,
           teamName: r.teamName,
@@ -48,9 +62,17 @@ router.post("/documents/:id/recipients", requireAuth, async (req: Request, res: 
           signOrder: i + 1,
           status: "pending",
           token: uuidv4(),
-        })
-      )
-    );
+        });
+      }
+    }
+
+    // Remove recipients that were dropped from the list, along with their fields
+    if (existing.length > newList.length) {
+      for (const removed of existing.slice(newList.length)) {
+        await db.delete(signatureFieldsTable).where(eq(signatureFieldsTable.recipientId, removed.id));
+        await db.delete(recipientsTable).where(eq(recipientsTable.id, removed.id));
+      }
+    }
 
     res.json({ success: true });
   } catch (err) {
