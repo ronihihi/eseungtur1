@@ -100,57 +100,8 @@ export async function buildSignedPdf(filepath: string, entries: SignatureEntry[]
         });
       }
     } else {
-      // No field placed — append a signature block at the foot of the last page
-      const page = pages[pages.length - 1];
-      const { width: pw, height: ph } = page.getSize();
-      const margin = 36;
-      const blockH = 56;
-      const blockY = margin;
-      const blockW = pw - margin * 2;
-
-      // Thin separator line above the block
-      page.drawLine({
-        start: { x: margin, y: blockY + blockH + 6 },
-        end: { x: pw - margin, y: blockY + blockH + 6 },
-        thickness: 0.5,
-        color: rgb(0.78, 0.78, 0.78),
-      });
-
-      // Signature image in the left portion of the block
-      const sigAreaW = blockW * 0.4;
-      const scale = Math.min(sigAreaW / pngImage.width, blockH / pngImage.height) * 0.85;
-      const sigW = pngImage.width * scale;
-      const sigH = pngImage.height * scale;
-      page.drawImage(pngImage, {
-        x: margin,
-        y: blockY + (blockH - sigH) / 2,
-        width: sigW,
-        height: sigH,
-      });
-
-      // Name + date + note to the right
-      const textX = margin + sigAreaW + 12;
-      page.drawText(entry.signerName, {
-        x: textX,
-        y: blockY + blockH * 0.62,
-        size: 9,
-        font: fontBold,
-        color: rgb(0.08, 0.08, 0.08),
-      });
-      page.drawText(dateLabel, {
-        x: textX,
-        y: blockY + blockH * 0.37,
-        size: 7,
-        font,
-        color: rgb(0.35, 0.35, 0.35),
-      });
-      page.drawText("Electronically signed via WorkflowSign", {
-        x: textX,
-        y: blockY + blockH * 0.15,
-        size: 6,
-        font,
-        color: rgb(0.55, 0.55, 0.55),
-      });
+      // No field placed — skip; signature only appears at the placed field position
+      continue;
     }
   }
 
