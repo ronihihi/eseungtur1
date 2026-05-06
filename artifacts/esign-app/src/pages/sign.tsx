@@ -56,6 +56,10 @@ export function SignPage() {
   const [sigDialogOpen, setSigDialogOpen] = useState(false);
   const [tempSig, setTempSig] = useState("");
   const sigPadSectionRef = useRef<HTMLDivElement>(null);
+  const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
+  const [activeFieldId, setActiveFieldId] = useState<string | null>(null);
+  const [activeFieldType, setActiveFieldType] = useState<"text" | "date">("text");
+  const [tempFieldValue, setTempFieldValue] = useState("");
 
   const { data, isLoading, isError, error } = useGetSigningInfo(token, {
     query: { enabled: !!token, queryKey: getGetSigningInfoQueryKey(token), retry: false },
@@ -152,8 +156,22 @@ export function SignPage() {
     form.clearErrors("signatureData");
     setSigDialogOpen(false);
     setTempSig("");
-    // Scroll to submit button so user can complete
     sigPadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+
+  const openFieldDialog = (fieldId: string, ft: "text" | "date") => {
+    setActiveFieldId(fieldId);
+    setActiveFieldType(ft);
+    setTempFieldValue(fieldValues[fieldId] ?? (ft === "date" ? todayISO() : ""));
+    setFieldDialogOpen(true);
+  };
+
+  const applyFieldValue = () => {
+    if (!activeFieldId) return;
+    setFieldValues((prev) => ({ ...prev, [activeFieldId]: tempFieldValue }));
+    setFieldDialogOpen(false);
+    setActiveFieldId(null);
+    setTempFieldValue("");
   };
 
   const renderSigningOverlay = () => (
@@ -166,13 +184,22 @@ export function SignPage() {
           const fieldId = (f as { id?: string }).id;
           const currentVal = fieldId ? fieldValues[fieldId] : undefined;
           const isSignField = ft === "signature" || ft === "initials";
+          const isTextField = ft === "text";
+          const isDateField = ft === "date";
           const alreadySigned = isSignField && signatureData;
+          const isFilled = !!currentVal;
+
+          const handleClick = isSignField && !alreadySigned
+            ? () => setSigDialogOpen(true)
+            : (isTextField || isDateField) && fieldId
+            ? () => openFieldDialog(fieldId, ft as "text" | "date")
+            : undefined;
 
           return (
             <div
               key={idx}
-              className={`absolute flex items-center justify-center rounded transition-all ${
-                isSignField && !alreadySigned
+              className={`absolute flex items-center justify-center rounded transition-all overflow-hidden ${
+                handleClick
                   ? "pointer-events-auto cursor-pointer hover:brightness-95 active:scale-[0.98]"
                   : "pointer-events-none"
               }`}
@@ -181,20 +208,21 @@ export function SignPage() {
                 top: `${f.y * 100}%`,
                 width: `${f.width * 100}%`,
                 height: `${f.height * 100}%`,
-                background: alreadySigned ? "rgba(34,197,94,0.1)" : cfg.bg,
-                border: `2px ${alreadySigned ? "solid #22c55e" : "dashed " + cfg.border}`,
+                background: (alreadySigned || isFilled) ? "rgba(34,197,94,0.1)" : cfg.bg,
+                border: `2px ${(alreadySigned || isFilled) ? "solid #22c55e" : "dashed " + cfg.border}`,
               }}
-              onClick={isSignField && !alreadySigned ? () => setSigDialogOpen(true) : undefined}
-              title={isSignField && !alreadySigned ? "Click to sign" : undefined}
+              onClick={handleClick}
+              title={
+                isSignField && !alreadySigned ? "Click to sign" :
+                isTextField ? (isFilled ? "Click to edit" : "Click to enter text") :
+                isDateField ? (isFilled ? "Click to change date" : "Click to set date") :
+                undefined
+              }
             >
               {alreadySigned ? (
                 <img src={signatureData} alt="Signature" className="max-h-full max-w-full object-contain p-0.5" />
-              ) : ft === "date" && currentVal ? (
-                <span className="text-[9px] font-semibold truncate px-1 select-none" style={{ color: cfg.textColor }}>
-                  {currentVal}
-                </span>
-              ) : ft === "text" && currentVal ? (
-                <span className="text-[9px] font-semibold truncate px-1 select-none" style={{ color: cfg.textColor }}>
+              ) : isFilled ? (
+                <span className="text-[9px] font-semibold truncate px-1 select-none" style={{ color: "#166534" }}>
                   {currentVal}
                 </span>
               ) : isSignField ? (
@@ -202,11 +230,17 @@ export function SignPage() {
                   <PenLine className="h-2.5 w-2.5 shrink-0" />
                   {cfg.label}
                 </span>
-              ) : (
-                <span className="text-[10px] font-semibold select-none" style={{ color: cfg.textColor }}>
+              ) : isTextField ? (
+                <span className="text-[10px] font-semibold select-none flex items-center gap-0.5 animate-pulse" style={{ color: cfg.textColor }}>
+                  <Type className="h-2.5 w-2.5 shrink-0" />
                   {cfg.label}
                 </span>
-              )}
+              ) : isDateField ? (
+                <span className="text-[10px] font-semibold select-none flex items-center gap-0.5 animate-pulse" style={{ color: cfg.textColor }}>
+                  <CalendarDays className="h-2.5 w-2.5 shrink-0" />
+                  {cfg.label}
+                </span>
+              ) : null}
             </div>
           );
         })}
@@ -609,6 +643,48 @@ export function SignPage() {
           </div>
         </div>
       </main>
+
+      {/* Text / Date field dialog — opens when user clicks a text or date field on the PDF */}
+      <Dialog open={fieldDialogOpen} onOpenChange={(open) => { setFieldDialogOpen(open); if (!open) { setActiveFieldId(null); setTempFieldValue(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {activeFieldType === "date" ? (
+                <><CalendarDays className="h-4 w-4 text-blue-500" /> Set Date</>
+              ) : (
+                <><Type className="h-4 w-4 text-green-600" /> Enter Text</>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            {activeFieldType === "date" ? (
+              <Input
+                type="date"
+                value={tempFieldValue}
+                onChange={(e) => setTempFieldValue(e.target.value)}
+                className="text-base"
+                autoFocus
+              />
+            ) : (
+              <Input
+                placeholder="Type your text here…"
+                value={tempFieldValue}
+                onChange={(e) => setTempFieldValue(e.target.value)}
+                className="text-base"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter") applyFieldValue(); }}
+              />
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setFieldDialogOpen(false)}>Cancel</Button>
+            <Button onClick={applyFieldValue} disabled={!tempFieldValue} className="gap-1.5">
+              <CheckCircle2 className="h-4 w-4" />
+              Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Click-to-sign dialog — opens when user clicks a signature field on the PDF */}
       <Dialog open={sigDialogOpen} onOpenChange={(open) => { setSigDialogOpen(open); if (!open) setTempSig(""); }}>

@@ -366,7 +366,34 @@ export function DocumentDetailPage() {
             {isDraft && (
               <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button disabled={!detailData?.recipients?.length}>
+                  <Button
+                    disabled={!detailData?.recipients?.length}
+                    onClick={(e) => {
+                      if (fieldsDirty && localFields.length > 0) {
+                        e.preventDefault();
+                        saveFieldsMutation.mutate(
+                          {
+                            id,
+                            data: {
+                              fields: localFields.map((f) => ({
+                                recipientId: f.recipientId,
+                                page: f.page,
+                                x: f.x,
+                                y: f.y,
+                                width: f.width,
+                                height: f.height,
+                                fieldType: f.fieldType,
+                              })),
+                            },
+                          },
+                          {
+                            onSuccess: () => { setFieldsDirty(false); setSendDialogOpen(true); },
+                            onError: () => setSendDialogOpen(true),
+                          }
+                        );
+                      }
+                    }}
+                  >
                     <Send className="mr-2 h-4 w-4" />
                     Send for Signature
                   </Button>
