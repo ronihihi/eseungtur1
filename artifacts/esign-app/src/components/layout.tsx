@@ -1,13 +1,36 @@
 import { useLogout, useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
-import { LogOut, FileSignature, LayoutDashboard, Plus, PenLine, Users, ClipboardList } from "lucide-react";
+import { LogOut, FileSignature, LayoutDashboard, Plus, PenLine, Users, ClipboardList, ChevronDown } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SavedSignatureDialog } from "@/components/saved-signature-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface LayoutProps {
   children: React.ReactNode;
+}
+
+function NavLink({ href, icon: Icon, label, active }: { href: string; icon: React.ElementType; label: string; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition-all ${
+        active
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+      }`}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </Link>
+  );
 }
 
 export function Layout({ children }: LayoutProps) {
@@ -32,71 +55,56 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
-      <header className="sticky top-0 z-30 w-full border-b bg-card">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-semibold text-lg text-primary">
-            <FileSignature className="h-6 w-6" />
-            <span>WorkflowSign</span>
+      <header className="sticky top-0 z-30 w-full border-b bg-card/80 backdrop-blur-sm">
+        <div className="container mx-auto px-4 h-14 flex items-center justify-between gap-4">
+          <Link href="/" className="flex items-center gap-2 font-bold text-base text-foreground shrink-0">
+            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shadow-sm">
+              <FileSignature className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <span className="hidden sm:inline">WorkflowSign</span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6">
-            <Link
-              href="/"
-              className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-                location === "/" ? "text-primary" : "text-muted-foreground hover:text-primary"
-              }`}
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
-            </Link>
-            <Link
-              href="/documents/upload"
-              className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-                location === "/documents/upload" ? "text-primary" : "text-muted-foreground hover:text-primary"
-              }`}
-            >
-              <Plus className="h-4 w-4" />
-              New Document
-            </Link>
+          <nav className="hidden md:flex items-center gap-1">
+            <NavLink href="/" icon={LayoutDashboard} label="Dashboard" active={location === "/"} />
+            <NavLink href="/documents/upload" icon={Plus} label="New Document" active={location === "/documents/upload"} />
             {isAdmin && (
-              <Link
-                href="/admin/users"
-                className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-                  location === "/admin/users" ? "text-primary" : "text-muted-foreground hover:text-primary"
-                }`}
-              >
-                <Users className="h-4 w-4" />
-                Users
-              </Link>
+              <NavLink href="/admin/users" icon={Users} label="Users" active={location === "/admin/users"} />
             )}
             {isAdmin && (
-              <Link
-                href="/admin/audit"
-                className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-                  location === "/admin/audit" ? "text-primary" : "text-muted-foreground hover:text-primary"
-                }`}
-              >
-                <ClipboardList className="h-4 w-4" />
-                Audit Log
-              </Link>
+              <NavLink href="/admin/audit" icon={ClipboardList} label="Audit Log" active={location === "/admin/audit"} />
             )}
           </nav>
 
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary/10 text-primary">{initials}</AvatarFallback>
-              </Avatar>
-              <span className="font-medium text-foreground">{me?.user?.name}</span>
-            </div>
+          <div className="flex items-center gap-2 ml-auto">
             <SavedSignatureDialog>
-              <Button variant="ghost" size="icon" title="My saved signature">
+              <Button variant="ghost" size="sm" className="hidden sm:flex gap-1.5 text-muted-foreground hover:text-foreground" title="My saved signature">
                 <PenLine className="h-4 w-4" />
+                <span className="text-xs font-medium">Signature</span>
               </Button>
             </SavedSignatureDialog>
-            <Button variant="ghost" size="icon" onClick={handleLogout} title="Log out">
-              <LogOut className="h-4 w-4" />
-            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-muted transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <Avatar className="h-7 w-7">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">{initials}</AvatarFallback>
+                  </Avatar>
+                  <span className="hidden sm:inline text-sm font-medium text-foreground max-w-28 truncate">{me?.user?.name}</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <div className="px-2 py-1.5">
+                  <p className="text-xs font-medium text-foreground truncate">{me?.user?.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{me?.user?.email}</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive gap-2">
+                  <LogOut className="h-3.5 w-3.5" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>

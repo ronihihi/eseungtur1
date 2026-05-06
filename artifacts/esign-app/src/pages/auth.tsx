@@ -10,8 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileSignature } from "lucide-react";
+import { FileSignature, ShieldCheck, Zap, Users } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -34,6 +33,13 @@ function MicrosoftIcon() {
     </svg>
   );
 }
+
+const FEATURES = [
+  { icon: FileSignature, text: "Collect legally binding e-signatures" },
+  { icon: Users, text: "Invite up to 7 recipients per document" },
+  { icon: Zap, text: "Sequential or simultaneous signing flows" },
+  { icon: ShieldCheck, text: "Full audit trail with timestamps & IPs" },
+];
 
 export function AuthPage() {
   const [, setLocation] = useLocation();
@@ -118,36 +124,73 @@ export function AuthPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-muted/30 p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="flex flex-col items-center justify-center space-y-2 text-center">
-          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center">
-            <FileSignature className="h-6 w-6 text-primary-foreground" />
+    <div className="min-h-[100dvh] flex">
+      {/* Left brand panel */}
+      <div className="hidden lg:flex lg:w-[46%] flex-col justify-between p-12 relative overflow-hidden"
+        style={{ background: "linear-gradient(145deg, hsl(207 100% 9%), hsl(203 100% 16%))" }}>
+        <div className="absolute inset-0 opacity-[0.06]"
+          style={{ backgroundImage: "radial-gradient(circle at 60% 40%, hsl(198 100% 44%), transparent 60%)" }} />
+
+        <div className="relative z-10 flex items-center gap-2.5">
+          <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center shadow-lg">
+            <FileSignature className="h-5 w-5 text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">WorkflowSign</h1>
-          <p className="text-muted-foreground text-sm">
-            Professional document signing for teams
-          </p>
+          <span className="text-white font-bold text-lg tracking-tight">WorkflowSign</span>
         </div>
 
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader>
-            <CardTitle>{isLogin ? "Welcome back" : "Create an account"}</CardTitle>
-            <CardDescription>
-              {isLogin
-                ? "Enter your email to sign in to your account"
-                : "Enter your details to get started"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="relative z-10 space-y-8">
+          <div className="space-y-3">
+            <h2 className="text-white text-3xl font-bold leading-tight">
+              Signatures your whole team can trust
+            </h2>
+            <p className="text-white/60 text-base leading-relaxed">
+              Send, sign, and track documents from anywhere — no printing, no faxing, no waiting.
+            </p>
+          </div>
+
+          <ul className="space-y-4">
+            {FEATURES.map(({ icon: Icon, text }) => (
+              <li key={text} className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                  <Icon className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-white/80 text-sm">{text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <p className="relative z-10 text-white/30 text-xs">
+          © {new Date().getFullYear()} WorkflowSign
+        </p>
+      </div>
+
+      {/* Right form panel */}
+      <div className="flex-1 flex items-center justify-center bg-muted/30 p-6 lg:p-12">
+        <div className="w-full max-w-sm space-y-7">
+
+          {/* Mobile logo */}
+          <div className="flex flex-col items-center gap-2 text-center lg:hidden">
+            <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center shadow">
+              <FileSignature className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <h1 className="text-xl font-bold tracking-tight">WorkflowSign</h1>
+            <p className="text-muted-foreground text-sm">Professional document signing for teams</p>
+          </div>
+
+          <div className="space-y-1">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">
+              {isLogin ? "Welcome back" : "Create an account"}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {isLogin ? "Sign in to continue to your workspace" : "Enter your details to get started"}
+            </p>
+          </div>
+
+          <div className="space-y-4">
             {azureConfig?.enabled && (
               <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleMicrosoftSignIn}
-                >
+                <Button type="button" variant="outline" className="w-full h-10" onClick={handleMicrosoftSignIn}>
                   <MicrosoftIcon />
                   Sign in with Microsoft
                 </Button>
@@ -156,7 +199,7 @@ export function AuthPage() {
                     <span className="w-full border-t" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                    <span className="bg-muted/30 px-2 text-muted-foreground">Or continue with email</span>
                   </div>
                 </div>
               </>
@@ -172,7 +215,7 @@ export function AuthPage() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="name@example.com" type="email" {...field} />
+                          <Input placeholder="name@example.com" type="email" className="h-10" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -185,14 +228,14 @@ export function AuthPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" {...field} />
+                          <Input type="password" className="h-10" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
-                    {loginMutation.isPending ? "Signing in..." : "Sign in"}
+                  <Button type="submit" className="w-full h-10" disabled={loginMutation.isPending}>
+                    {loginMutation.isPending ? "Signing in…" : "Sign in"}
                   </Button>
                 </form>
               </Form>
@@ -204,9 +247,9 @@ export function AuthPage() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Name</FormLabel>
+                        <FormLabel>Full name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John Doe" {...field} />
+                          <Input placeholder="Jane Smith" className="h-10" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -219,7 +262,7 @@ export function AuthPage() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="name@example.com" type="email" {...field} />
+                          <Input placeholder="name@example.com" type="email" className="h-10" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -232,33 +275,31 @@ export function AuthPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" {...field} />
+                          <Input type="password" className="h-10" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
-                    {registerMutation.isPending ? "Creating account..." : "Create account"}
+                  <Button type="submit" className="w-full h-10" disabled={registerMutation.isPending}>
+                    {registerMutation.isPending ? "Creating account…" : "Create account"}
                   </Button>
                 </form>
               </Form>
             )}
+          </div>
 
-            <div className="text-center text-sm">
-              <span className="text-muted-foreground">
-                {isLogin ? "Don't have an account? " : "Already have an account? "}
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                className="font-medium text-primary hover:underline focus:outline-none"
-              >
-                {isLogin ? "Sign up" : "Sign in"}
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+          <p className="text-center text-sm text-muted-foreground">
+            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            <button
+              type="button"
+              onClick={() => setIsLogin(!isLogin)}
+              className="font-semibold text-primary hover:underline focus:outline-none"
+            >
+              {isLogin ? "Sign up" : "Sign in"}
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );
