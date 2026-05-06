@@ -161,6 +161,8 @@ export function DocumentDetailPage() {
     }
   }, [recipients, selectedRecipientId]);
 
+  const pdfUrl = useMemo(() => ({ url: `/api/documents/${id}/file`, withCredentials: true }), [id]);
+
   const getRecipientColor = (recipientId: string) => {
     const idx = recipients.findIndex((r) => r.id === recipientId);
     return RECIPIENT_COLORS[idx >= 0 ? idx % RECIPIENT_COLORS.length : 0];
@@ -345,7 +347,6 @@ export function DocumentDetailPage() {
     );
   }
 
-  const pdfUrl = useMemo(() => ({ url: `/api/documents/${id}/file`, withCredentials: true }), [id]);
   const isPdf = doc.filename.toLowerCase().endsWith(".pdf");
 
   return (
