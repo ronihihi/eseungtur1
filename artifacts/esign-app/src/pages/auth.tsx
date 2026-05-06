@@ -215,7 +215,7 @@ export function AuthPage() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="name@example.com" type="email" className="h-10" {...field} />
+                          <Input placeholder="name@example.com" type="email" autoComplete="email" className="h-10" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -228,7 +228,7 @@ export function AuthPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" className="h-10" {...field} />
+                          <Input type="password" autoComplete="current-password" className="h-10" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -249,7 +249,7 @@ export function AuthPage() {
                       <FormItem>
                         <FormLabel>Full name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Jane Smith" className="h-10" {...field} />
+                          <Input placeholder="Jane Smith" autoComplete="name" className="h-10" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -262,7 +262,7 @@ export function AuthPage() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="name@example.com" type="email" className="h-10" {...field} />
+                          <Input placeholder="name@example.com" type="email" autoComplete="email" className="h-10" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -275,7 +275,7 @@ export function AuthPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" className="h-10" {...field} />
+                          <Input type="password" autoComplete="new-password" className="h-10" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
