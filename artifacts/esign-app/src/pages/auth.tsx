@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLogin, useRegister, getGetMeQueryKey } from "@workspace/api-client-react";
+import type { MeResponse } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -48,8 +49,8 @@ export function AuthPage() {
     loginMutation.mutate(
       { data: values },
       {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+        onSuccess: (data) => {
+          queryClient.setQueryData<MeResponse>(getGetMeQueryKey(), { user: data.user });
           setLocation(redirectTo);
         },
         onError: (err: unknown) => {
@@ -67,8 +68,8 @@ export function AuthPage() {
     registerMutation.mutate(
       { data: values },
       {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+        onSuccess: (data) => {
+          queryClient.setQueryData<MeResponse>(getGetMeQueryKey(), { user: data.user });
           setLocation(redirectTo);
         },
         onError: (err: unknown) => {
