@@ -985,6 +985,8 @@ components:
           type: string
         alreadySigned:
           type: boolean
+        documentStatus:
+          type: string
         fields:
           type: array
           items:
@@ -994,6 +996,7 @@ components:
         - documentTitle
         - documentFilename
         - alreadySigned
+        - documentStatus
         - fields
 
     SubmitSignatureRequest:

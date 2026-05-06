@@ -359,6 +359,7 @@ export const GetSigningInfoResponse = zod.object({
   documentTitle: zod.string(),
   documentFilename: zod.string(),
   alreadySigned: zod.boolean(),
+  documentStatus: zod.string(),
   fields: zod.array(
     zod.object({
       id: zod.string(),

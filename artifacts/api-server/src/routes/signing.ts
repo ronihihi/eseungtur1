@@ -114,6 +114,7 @@ router.get("/sign/:token", async (req: Request, res: Response) => {
       documentTitle: doc?.title ?? "Unknown Document",
       documentFilename: doc?.filename ?? "",
       alreadySigned: r.status === "signed",
+      documentStatus: doc?.status ?? "sent",
       fields,
     });
   } catch (err) {
@@ -250,6 +251,11 @@ router.get("/sign/:token/download", async (req: Request, res: Response) => {
 
     const allRecipients = await db.select().from(recipientsTable).where(eq(recipientsTable.documentId, docId));
     const signedRecipients = allRecipients.filter((r) => r.status === "signed");
+
+    if (signedRecipients.length < allRecipients.length) {
+      res.status(403).json({ error: "The signed document will be available for download once all parties have completed signing." });
+      return;
+    }
 
     const allFields = await db
       .select()

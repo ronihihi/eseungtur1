@@ -3,7 +3,7 @@ import { useParams } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { FileSignature, CheckCircle2, AlertCircle, Stamp, FileText, Download, PenLine, CalendarDays, Type } from "lucide-react";
+import { FileSignature, CheckCircle2, AlertCircle, Stamp, FileText, Download, PenLine, CalendarDays, Type, Clock } from "lucide-react";
 
 import {
   useGetSigningInfo,
@@ -323,12 +323,19 @@ export function SignPage() {
               <FileSignature className="h-5 w-5" />
               <span>WorkflowSign</span>
             </div>
-            <a href={`/api/sign/${token}/download`} download={data.documentFilename || "document.pdf"}>
-              <Button variant="outline" size="sm">
-                <Download className="mr-1.5 h-3.5 w-3.5" />
-                Download
-              </Button>
-            </a>
+            {data.documentStatus === "completed" ? (
+              <a href={`/api/sign/${token}/download`} download={data.documentFilename || "document.pdf"}>
+                <Button variant="outline" size="sm">
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  Download
+                </Button>
+              </a>
+            ) : (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                Awaiting other signers
+              </span>
+            )}
           </div>
         </header>
 
@@ -385,14 +392,21 @@ export function SignPage() {
                   <p className="font-semibold">{data.documentFilename}</p>
                   <p className="text-sm text-muted-foreground">Your signature has been recorded.</p>
                 </div>
-                <a
-                  href={`/api/sign/${token}/download`}
-                  download={data.documentFilename || "document.pdf"}
-                  className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  Download Document
-                </a>
+                {data.documentStatus === "completed" ? (
+                  <a
+                    href={`/api/sign/${token}/download`}
+                    download={data.documentFilename || "document.pdf"}
+                    className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Document
+                  </a>
+                ) : (
+                  <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    Download available once all parties have signed.
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}

@@ -213,6 +213,7 @@ export interface SigningInfoResponse {
   documentTitle: string;
   documentFilename: string;
   alreadySigned: boolean;
+  documentStatus: string;
   fields: SignatureField[];
 }
 

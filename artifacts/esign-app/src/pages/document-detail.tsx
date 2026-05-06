@@ -156,10 +156,13 @@ export function DocumentDetailPage() {
   }, [detailData?.fields]);
 
   useEffect(() => {
-    if (recipients.length > 0 && !selectedRecipientId) {
-      setSelectedRecipientId(recipients[0].id);
+    if (recipients.length > 0) {
+      const isValid = recipients.some((r) => r.id === selectedRecipientId);
+      if (!isValid) {
+        setSelectedRecipientId(recipients[0].id);
+      }
     }
-  }, [recipients, selectedRecipientId]);
+  }, [recipients]);
 
   const pdfUrl = useMemo(() => ({ url: `/api/documents/${id}/file`, withCredentials: true }), [id]);
 
