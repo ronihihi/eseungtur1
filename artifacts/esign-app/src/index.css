@@ -170,3 +170,9 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+@keyframes loading {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}

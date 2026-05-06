@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -25,6 +25,8 @@ const registerSchema = z.object({
 
 export function AuthPage() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
+  const redirectTo = new URLSearchParams(search).get("redirect") || "/";
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLogin, setIsLogin] = useState(true);
@@ -48,7 +50,7 @@ export function AuthPage() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
-          setLocation("/");
+          setLocation(redirectTo);
         },
         onError: (err: unknown) => {
           toast({
@@ -67,7 +69,7 @@ export function AuthPage() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
-          setLocation("/");
+          setLocation(redirectTo);
         },
         onError: (err: unknown) => {
           toast({

@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { FileSignature } from "lucide-react";
 
 import { useGetMe } from "@workspace/api-client-react";
 
@@ -22,15 +23,28 @@ const queryClient = new QueryClient({
   },
 });
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
+      <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
+        <FileSignature className="h-5 w-5 text-primary-foreground" />
+      </div>
+      <div className="h-1 w-24 rounded-full bg-muted overflow-hidden">
+        <div className="h-full bg-primary rounded-full animate-[loading_1.2s_ease-in-out_infinite]" />
+      </div>
+    </div>
+  );
+}
+
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: me, isLoading } = useGetMe();
+  const [location] = useLocation();
 
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
+  if (isLoading) return <LoadingScreen />;
 
   if (!me?.user) {
-    return <Redirect to="/auth" />;
+    const redirect = encodeURIComponent(location);
+    return <Redirect to={`/auth?redirect=${redirect}`} />;
   }
 
   return (
