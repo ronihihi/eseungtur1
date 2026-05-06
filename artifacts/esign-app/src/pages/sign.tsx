@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -81,6 +81,7 @@ export function SignPage() {
 
   const recipientFields = data?.fields ?? [];
   const isPdf = data?.documentFilename?.toLowerCase().endsWith(".pdf") ?? true;
+  const signingFileUrl = useMemo(() => `/api/sign/${token}/file`, [token]);
 
   // Show signature pad when: no fields placed at all (free-form signing), OR a signature/initials field exists
   const hasSignatureFields =
@@ -350,7 +351,7 @@ export function SignPage() {
                 </p>
               )}
               <PdfViewer
-                fileUrl={`/api/sign/${token}/file`}
+                fileUrl={signingFileUrl}
                 currentPage={currentPage}
                 numPages={numPages}
                 onLoadSuccess={setNumPages}
@@ -439,7 +440,7 @@ export function SignPage() {
                   </div>
                 )}
                 <PdfViewer
-                  fileUrl={`/api/sign/${token}/file`}
+                  fileUrl={signingFileUrl}
                   currentPage={currentPage}
                   numPages={numPages}
                   onLoadSuccess={setNumPages}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -59,6 +59,7 @@ interface FieldItem {
   width: number;
   height: number;
   fieldType: FieldType;
+  fieldValue?: string | null;
 }
 
 const FIELD_TYPES: { type: FieldType; label: string; icon: React.ElementType; defaultW: number; defaultH: number }[] = [
@@ -147,6 +148,7 @@ export function DocumentDetailPage() {
         (detailData.fields as FieldItem[]).map((f) => ({
           ...f,
           fieldType: (f.fieldType as FieldType) ?? "signature",
+          fieldValue: (f as { fieldValue?: string | null }).fieldValue ?? null,
         }))
       );
       setFieldsDirty(false);
@@ -277,30 +279,42 @@ export function DocumentDetailPage() {
           const color = getRecipientColor(f.recipientId);
           const recipient = recipients.find((r) => r.id === f.recipientId);
           const typeLabel = FIELD_TYPE_LABEL[f.fieldType] ?? "Sign";
+          const isSigned = !!f.fieldValue;
+          const isSignImg = isSigned && (f.fieldType === "signature" || f.fieldType === "initials") && f.fieldValue!.startsWith("data:image");
+          const isText = isSigned && (f.fieldType === "text" || f.fieldType === "date");
+
           return (
             <div
               key={f.id}
-              className="absolute pointer-events-auto flex items-center justify-center rounded group"
+              className="absolute pointer-events-auto flex items-center justify-center rounded overflow-hidden group"
               style={{
                 left: `${f.x * 100}%`,
                 top: `${f.y * 100}%`,
                 width: `${f.width * 100}%`,
                 height: `${f.height * 100}%`,
-                background: color.bg,
-                border: `2px dashed ${color.border}`,
+                background: isSigned ? "rgba(34,197,94,0.10)" : color.bg,
+                border: `2px ${isSigned ? "solid #22c55e" : `dashed ${color.border}`}`,
                 cursor: isDraft ? "pointer" : "default",
               }}
-              title={isDraft ? `Click to remove (${typeLabel} for ${recipient?.teamName})` : recipient?.teamName}
+              title={isDraft ? `Click to remove (${typeLabel} for ${recipient?.teamName})` : `${recipient?.teamName}${isSigned ? " – Signed" : ""}`}
               onClick={(e) => {
                 if (isDraft) { e.stopPropagation(); removeField(f.id); }
               }}
             >
-              <span
-                className="text-[10px] font-semibold truncate px-1 leading-none select-none"
-                style={{ color: color.text }}
-              >
-                {typeLabel} · {recipient?.teamName || "?"}
-              </span>
+              {isSignImg ? (
+                <img src={f.fieldValue!} alt="Signature" className="max-h-full max-w-full object-contain p-0.5" />
+              ) : isText ? (
+                <span className="text-[9px] font-semibold truncate px-1 select-none text-green-800">
+                  {f.fieldValue}
+                </span>
+              ) : (
+                <span
+                  className="text-[10px] font-semibold truncate px-1 leading-none select-none"
+                  style={{ color: color.text }}
+                >
+                  {typeLabel} · {recipient?.teamName || "?"}
+                </span>
+              )}
             </div>
           );
         })}
@@ -331,7 +345,7 @@ export function DocumentDetailPage() {
     );
   }
 
-  const pdfUrl = { url: `/api/documents/${id}/file`, withCredentials: true };
+  const pdfUrl = useMemo(() => ({ url: `/api/documents/${id}/file`, withCredentials: true }), [id]);
   const isPdf = doc.filename.toLowerCase().endsWith(".pdf");
 
   return (
