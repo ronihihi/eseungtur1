@@ -54,14 +54,6 @@ export async function buildSignedPdf(filepath: string, entries: FieldEntry[]): P
         continue;
       }
 
-      // Green border around field
-      page.drawRectangle({
-        x: fx, y: fy, width: fw, height: fh,
-        borderColor: rgb(0.08, 0.65, 0.33),
-        borderWidth: 1,
-        opacity: 0,
-      });
-
       // Signature image centred and scaled to fit
       const sigPad = 4;
       const scale = Math.min((fw - sigPad * 2) / pngImage.width, (fh - sigPad * 2) / pngImage.height);
