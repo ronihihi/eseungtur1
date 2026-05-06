@@ -449,6 +449,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /signing/my-requests:
+    get:
+      operationId: getMySigningRequests
+      tags: [signing]
+      summary: Get documents the current user has been asked to sign
+      security:
+        - sessionAuth: []
+      responses:
+        "200":
+          description: List of signing requests for the current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MySigningRequestsResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /auth/azure-enabled:
     get:
       operationId: getAzureEnabled
@@ -1085,3 +1106,40 @@ components:
             $ref: "#/components/schemas/AuditEvent"
       required:
         - events
+
+    SigningRequest:
+      type: object
+      properties:
+        documentId:
+          type: string
+        documentTitle:
+          type: string
+        senderName:
+          type: string
+        recipientStatus:
+          type: string
+          enum: [pending, viewed, signed]
+        token:
+          type: string
+        signedAt:
+          type: string
+          nullable: true
+        sentAt:
+          type: string
+          nullable: true
+      required:
+        - documentId
+        - documentTitle
+        - senderName
+        - recipientStatus
+        - token
+
+    MySigningRequestsResponse:
+      type: object
+      properties:
+        requests:
+          type: array
+          items:
+            $ref: "#/components/schemas/SigningRequest"
+      required:
+        - requests

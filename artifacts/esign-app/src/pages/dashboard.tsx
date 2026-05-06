@@ -1,9 +1,9 @@
-import { useListDocuments } from "@workspace/api-client-react";
+import { useListDocuments, useGetMySigningRequests } from "@workspace/api-client-react";
 import { Link } from "wouter";
-import { format } from "date-fns";
-import { Plus, FileText, CheckCircle2, Clock, Send, FileSignature, Trash2 } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { Plus, FileText, CheckCircle2, Clock, Send, FileSignature, Trash2, PenLine, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDeleteDocument, getListDocumentsQueryKey } from "@workspace/api-client-react";
@@ -23,7 +23,9 @@ import {
 
 export function DashboardPage() {
   const { data, isLoading } = useListDocuments();
+  const { data: signingData, isLoading: signingLoading } = useGetMySigningRequests();
   const documents = data?.documents || [];
+  const signingRequests = signingData?.requests || [];
   const deleteMutation = useDeleteDocument();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -47,6 +49,7 @@ export function DashboardPage() {
   const completedDocuments = documents.filter((d) => d.status === "completed").length;
   const pendingDocuments = documents.filter((d) => d.status === "sent").length;
   const draftDocuments = documents.filter((d) => d.status === "draft").length;
+  const pendingSignatures = signingRequests.filter((r) => r.recipientStatus !== "signed").length;
 
   return (
     <div className="space-y-8">
@@ -93,18 +96,117 @@ export function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Drafts</CardTitle>
-            <FileSignature className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Awaiting My Signature</CardTitle>
+            <PenLine className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {isLoading ? <Skeleton className="h-7 w-12" /> : <div className="text-2xl font-bold">{draftDocuments}</div>}
+            {signingLoading ? <Skeleton className="h-7 w-12" /> : <div className="text-2xl font-bold">{pendingSignatures}</div>}
           </CardContent>
         </Card>
       </div>
 
+      {/* Documents sent to me to sign */}
+      {(signingLoading || signingRequests.length > 0) && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold tracking-tight">Documents to Sign</h2>
+            {pendingSignatures > 0 && (
+              <Badge variant="default" className="bg-orange-500 hover:bg-orange-600 text-white border-transparent">
+                {pendingSignatures} pending
+              </Badge>
+            )}
+          </div>
+
+          {signingLoading ? (
+            <div className="space-y-3">
+              {[1, 2].map((i) => (
+                <Card key={i}>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <Skeleton className="h-5 w-48" />
+                        <Skeleton className="h-4 w-32" />
+                      </div>
+                      <Skeleton className="h-9 w-24" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {signingRequests.map((req) => {
+                const isPending = req.recipientStatus !== "signed";
+                return (
+                  <Card
+                    key={req.token}
+                    className={`transition-colors ${isPending ? "border-orange-200 bg-orange-50/30 dark:border-orange-900/40 dark:bg-orange-950/10" : ""}`}
+                  >
+                    <CardContent className="p-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-5 gap-3">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
+                              isPending ? "bg-orange-100 dark:bg-orange-900/30" : "bg-green-100 dark:bg-green-900/30"
+                            }`}
+                          >
+                            {isPending ? (
+                              <PenLine className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            )}
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="font-semibold leading-snug">{req.documentTitle}</p>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
+                              <span>From {req.senderName}</span>
+                              {req.sentAt && (
+                                <>
+                                  <span>•</span>
+                                  <span>{formatDistanceToNow(new Date(req.sentAt), { addSuffix: true })}</span>
+                                </>
+                              )}
+                              {req.signedAt && (
+                                <>
+                                  <span>•</span>
+                                  <span>Signed {format(new Date(req.signedAt), "MMM d, yyyy")}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 sm:ml-auto shrink-0">
+                          <SigningStatusBadge status={req.recipientStatus} />
+                          {isPending ? (
+                            <Link href={`/sign/${req.token}`}>
+                              <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
+                                <PenLine className="mr-1.5 h-3.5 w-3.5" />
+                                Sign Now
+                              </Button>
+                            </Link>
+                          ) : (
+                            <Link href={`/sign/${req.token}`}>
+                              <Button size="sm" variant="outline">
+                                <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                View
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Documents I uploaded */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold tracking-tight">Recent Documents</h2>
-        
+        <h2 className="text-xl font-semibold tracking-tight">My Documents</h2>
+
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
@@ -166,14 +268,14 @@ export function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-4 sm:ml-auto shrink-0">
                       <StatusBadge status={doc.status} />
-                      
+
                       <div className="flex items-center gap-2">
                         <Link href={`/documents/${doc.id}`}>
                           <Button variant="secondary" size="sm">
                             View
                           </Button>
                         </Link>
-                        
+
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
@@ -209,6 +311,32 @@ export function DashboardPage() {
       </div>
     </div>
   );
+}
+
+function SigningStatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case "signed":
+      return (
+        <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white border-transparent">
+          <CheckCircle2 className="mr-1 h-3 w-3" />
+          Signed
+        </Badge>
+      );
+    case "viewed":
+      return (
+        <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 border-transparent">
+          <Eye className="mr-1 h-3 w-3" />
+          Viewed
+        </Badge>
+      );
+    default:
+      return (
+        <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50 dark:bg-orange-950/20">
+          <Clock className="mr-1 h-3 w-3" />
+          Pending
+        </Badge>
+      );
+  }
 }
 
 function StatusBadge({ status }: { status: string }) {

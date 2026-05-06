@@ -29,6 +29,7 @@ import type {
   HealthStatus,
   LoginRequest,
   MeResponse,
+  MySigningRequestsResponse,
   RegisterRequest,
   SaveFieldsRequest,
   SaveSignatureRequest,
@@ -1638,6 +1639,81 @@ export const useSubmitSignature = <
 > => {
   return useMutation(getSubmitSignatureMutationOptions(options));
 };
+
+/**
+ * @summary Get documents the current user has been asked to sign
+ */
+export const getGetMySigningRequestsUrl = () => {
+  return `/api/signing/my-requests`;
+};
+
+export const getMySigningRequests = async (
+  options?: RequestInit,
+): Promise<MySigningRequestsResponse> => {
+  return customFetch<MySigningRequestsResponse>(getGetMySigningRequestsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMySigningRequestsQueryKey = () => {
+  return [`/api/signing/my-requests`] as const;
+};
+
+export const getGetMySigningRequestsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMySigningRequests>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMySigningRequests>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMySigningRequestsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMySigningRequests>>
+  > = ({ signal }) => getMySigningRequests({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMySigningRequests>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMySigningRequestsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMySigningRequests>>
+>;
+export type GetMySigningRequestsQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get documents the current user has been asked to sign
+ */
+
+export function useGetMySigningRequests<
+  TData = Awaited<ReturnType<typeof getMySigningRequests>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMySigningRequests>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMySigningRequestsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Check if Azure SSO is configured

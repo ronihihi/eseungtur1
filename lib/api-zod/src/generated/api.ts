@@ -373,6 +373,23 @@ export const SubmitSignatureResponse = zod.object({
 });
 
 /**
+ * @summary Get documents the current user has been asked to sign
+ */
+export const GetMySigningRequestsResponse = zod.object({
+  requests: zod.array(
+    zod.object({
+      documentId: zod.string(),
+      documentTitle: zod.string(),
+      senderName: zod.string(),
+      recipientStatus: zod.enum(["pending", "viewed", "signed"]),
+      token: zod.string(),
+      signedAt: zod.string().nullish(),
+      sentAt: zod.string().nullish(),
+    }),
+  ),
+});
+
+/**
  * @summary Check if Azure SSO is configured
  */
 export const GetAzureEnabledResponse = zod.object({

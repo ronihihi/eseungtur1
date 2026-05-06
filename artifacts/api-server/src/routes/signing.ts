@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, documentsTable, recipientsTable, signatureFieldsTable } from "@workspace/db";
 import fs from "fs";
 import path from "path";
@@ -8,6 +8,75 @@ import type { Request, Response } from "express";
 import { sendSigningEmail } from "./emailService.js";
 
 const router: IRouter = Router();
+
+// Authenticated: documents the current user has been asked to sign
+router.get("/signing/my-requests", async (req: Request, res: Response) => {
+  if (!req.session.userId) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  try {
+    const email = (req.session.userEmail ?? "").toLowerCase();
+
+    const recipients = await db
+      .select({
+        id: recipientsTable.id,
+        documentId: recipientsTable.documentId,
+        status: recipientsTable.status,
+        token: recipientsTable.token,
+        signedAt: recipientsTable.signedAt,
+        teamName: recipientsTable.teamName,
+      })
+      .from(recipientsTable)
+      .where(eq(recipientsTable.email, email));
+
+    if (recipients.length === 0) {
+      res.json({ requests: [] });
+      return;
+    }
+
+    const documentIds = [...new Set(recipients.map((r) => r.documentId))];
+    const documents = await db
+      .select({
+        id: documentsTable.id,
+        title: documentsTable.title,
+        uploaderName: documentsTable.uploaderName,
+        status: documentsTable.status,
+        createdAt: documentsTable.createdAt,
+      })
+      .from(documentsTable)
+      .where(inArray(documentsTable.id, documentIds));
+
+    const docMap = new Map(documents.map((d) => [d.id, d]));
+
+    const requests = recipients
+      .map((r) => {
+        const doc = docMap.get(r.documentId);
+        return {
+          documentId: r.documentId,
+          documentTitle: doc?.title ?? "Unknown Document",
+          senderName: doc?.uploaderName ?? "Unknown",
+          recipientStatus: r.status,
+          token: r.token,
+          signedAt: r.signedAt?.toISOString() ?? null,
+          sentAt: doc?.createdAt.toISOString() ?? null,
+        };
+      })
+      .sort((a, b) => {
+        // Pending first, then most recent
+        const aIsPending = a.recipientStatus !== "signed";
+        const bIsPending = b.recipientStatus !== "signed";
+        if (aIsPending && !bIsPending) return -1;
+        if (!aIsPending && bIsPending) return 1;
+        return new Date(b.sentAt ?? 0).getTime() - new Date(a.sentAt ?? 0).getTime();
+      });
+
+    res.json({ requests });
+  } catch (err) {
+    req.log.error({ err }, "my signing requests error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 router.get("/sign/:token", async (req: Request, res: Response) => {
   const token = req.params.token as string;

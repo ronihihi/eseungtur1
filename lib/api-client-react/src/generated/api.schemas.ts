@@ -283,6 +283,29 @@ export interface AuditLogResponse {
   events: AuditEvent[];
 }
 
+export type SigningRequestRecipientStatus =
+  (typeof SigningRequestRecipientStatus)[keyof typeof SigningRequestRecipientStatus];
+
+export const SigningRequestRecipientStatus = {
+  pending: "pending",
+  viewed: "viewed",
+  signed: "signed",
+} as const;
+
+export interface SigningRequest {
+  documentId: string;
+  documentTitle: string;
+  senderName: string;
+  recipientStatus: SigningRequestRecipientStatus;
+  token: string;
+  signedAt?: string | null;
+  sentAt?: string | null;
+}
+
+export interface MySigningRequestsResponse {
+  requests: SigningRequest[];
+}
+
 export type UploadDocumentBodySigningOrder =
   (typeof UploadDocumentBodySigningOrder)[keyof typeof UploadDocumentBodySigningOrder];
 
