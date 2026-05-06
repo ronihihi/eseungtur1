@@ -165,7 +165,7 @@ export function AdminUsersPage() {
             User Management
           </h1>
           <p className="text-muted-foreground mt-1">
-            Manage who has access to WorkflowSign
+            Manage who has access to WorkFlowSign SOS Village Palestine
           </p>
         </div>
 

@@ -340,7 +340,7 @@ export function SignPage() {
           <div className="container mx-auto px-4 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2 font-semibold text-primary hover:opacity-80 transition-opacity">
               <FileSignature className="h-5 w-5" />
-              <span>WorkflowSign</span>
+              <span>WorkFlowSign SOS Village Palestine</span>
             </Link>
             {data.documentStatus === "completed" ? (
               <a href={`/api/sign/${token}/download`} download={data.documentFilename || "document.pdf"}>
@@ -440,7 +440,7 @@ export function SignPage() {
         <div className="container mx-auto px-4 flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2 font-semibold text-primary hover:opacity-80 transition-opacity">
             <FileSignature className="h-5 w-5" />
-            <span>WorkflowSign</span>
+            <span>WorkFlowSign SOS Village Palestine</span>
           </Link>
         </div>
       </header>

@@ -61,7 +61,7 @@ export function Layout({ children }: LayoutProps) {
             <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shadow-sm">
               <FileSignature className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="hidden sm:inline">WorkflowSign</span>
+            <span className="hidden sm:inline">WorkFlowSign SOS Village Palestine</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
