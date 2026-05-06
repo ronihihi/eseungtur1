@@ -78,9 +78,13 @@ export function SignPage() {
   const recipientFields = data?.fields ?? [];
   const isPdf = data?.documentFilename?.toLowerCase().endsWith(".pdf") ?? true;
 
-  const hasSignatureFields = recipientFields.some(
-    (f) => (f as { fieldType?: string }).fieldType === "signature" || (f as { fieldType?: string }).fieldType === "initials" || !(f as { fieldType?: string }).fieldType
-  );
+  // Show signature pad when: no fields placed at all (free-form signing), OR a signature/initials field exists
+  const hasSignatureFields =
+    recipientFields.length === 0 ||
+    recipientFields.some((f) => {
+      const ft = (f as { fieldType?: string }).fieldType;
+      return ft === "signature" || ft === "initials" || !ft;
+    });
   const hasTextFields = recipientFields.filter((f) => (f as { fieldType?: string }).fieldType === "text");
   const hasDateFields = recipientFields.filter((f) => (f as { fieldType?: string }).fieldType === "date");
 
