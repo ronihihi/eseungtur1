@@ -105,6 +105,14 @@ export function UploadPage() {
       return;
     }
 
+    const sessionCheck = await fetch("/api/auth/me", { credentials: "include" });
+    const sessionData = sessionCheck.ok ? (await sessionCheck.json() as { user: unknown }) : null;
+    if (!sessionData?.user) {
+      toast({ variant: "destructive", title: "Session expired", description: "Please log in again before uploading." });
+      setLocation("/auth");
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress(0);
 

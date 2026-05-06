@@ -61,6 +61,7 @@ const upload = multer({
 
 function requireAuth(req: Request, res: Response, next: () => void) {
   if (!req.session.userId) {
+    req.resume();
     res.status(401).json({ error: "Please log in first" });
     return;
   }
