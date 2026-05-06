@@ -17,6 +17,7 @@ function requireAuth(req: Request, res: Response, next: () => void) {
 }
 
 router.post("/documents/:id/recipients", requireAuth, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
   try {
     const parsed = SetRecipientsBody.safeParse(req.body);
     if (!parsed.success) {
@@ -27,7 +28,7 @@ router.post("/documents/:id/recipients", requireAuth, async (req: Request, res: 
     const docs = await db
       .select()
       .from(documentsTable)
-      .where(and(eq(documentsTable.id, req.params.id), eq(documentsTable.uploadedBy, req.session.userId!)))
+      .where(and(eq(documentsTable.id, id), eq(documentsTable.uploadedBy, req.session.userId!)))
       .limit(1);
 
     if (docs.length === 0) {
@@ -35,13 +36,13 @@ router.post("/documents/:id/recipients", requireAuth, async (req: Request, res: 
       return;
     }
 
-    await db.delete(recipientsTable).where(eq(recipientsTable.documentId, req.params.id));
+    await db.delete(recipientsTable).where(eq(recipientsTable.documentId, id));
 
     await Promise.all(
       parsed.data.recipients.map((r, i) =>
         db.insert(recipientsTable).values({
           id: uuidv4(),
-          documentId: req.params.id,
+          documentId: id,
           teamName: r.teamName,
           email: r.email,
           signOrder: i + 1,
@@ -59,13 +60,14 @@ router.post("/documents/:id/recipients", requireAuth, async (req: Request, res: 
 });
 
 router.post("/documents/:id/send", requireAuth, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
   try {
     const { subject, message } = req.body as { subject?: string; message?: string };
 
     const docs = await db
       .select()
       .from(documentsTable)
-      .where(and(eq(documentsTable.id, req.params.id), eq(documentsTable.uploadedBy, req.session.userId!)))
+      .where(and(eq(documentsTable.id, id), eq(documentsTable.uploadedBy, req.session.userId!)))
       .limit(1);
 
     if (docs.length === 0) {
@@ -74,11 +76,7 @@ router.post("/documents/:id/send", requireAuth, async (req: Request, res: Respon
     }
 
     const doc = docs[0];
-    const recipients = await db
-      .select()
-      .from(recipientsTable)
-      .where(eq(recipientsTable.documentId, req.params.id));
-
+    const recipients = await db.select().from(recipientsTable).where(eq(recipientsTable.documentId, id));
     recipients.sort((a, b) => a.signOrder - b.signOrder);
 
     if (recipients.length === 0) {
@@ -96,7 +94,7 @@ router.post("/documents/:id/send", requireAuth, async (req: Request, res: Respon
       await sendSigningEmail(r, doc, `${baseUrl}/sign/${r.token}`, subject, message, req.session.userName);
     }
 
-    await db.update(documentsTable).set({ status: "sent" }).where(eq(documentsTable.id, req.params.id));
+    await db.update(documentsTable).set({ status: "sent" }).where(eq(documentsTable.id, id));
 
     res.json({ success: true, sent: toSend.length });
   } catch (err) {
@@ -106,11 +104,12 @@ router.post("/documents/:id/send", requireAuth, async (req: Request, res: Respon
 });
 
 router.post("/recipients/:recipientId/remind", requireAuth, async (req: Request, res: Response) => {
+  const recipientId = req.params.recipientId as string;
   try {
     const recs = await db
       .select()
       .from(recipientsTable)
-      .where(eq(recipientsTable.id, req.params.recipientId))
+      .where(eq(recipientsTable.id, recipientId))
       .limit(1);
 
     if (recs.length === 0) {

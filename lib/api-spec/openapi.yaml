@@ -108,6 +108,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/MeResponse"
 
+  /auth/me/signature:
+    get:
+      operationId: getSavedSignature
+      tags: [auth]
+      summary: Get the current user's saved signature
+      responses:
+        "200":
+          description: Saved signature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedSignatureResponse"
+    put:
+      operationId: saveSignature
+      tags: [auth]
+      summary: Save a signature for the current user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveSignatureRequest"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
   /documents:
     get:
       operationId: listDocuments
@@ -245,6 +275,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /documents/{id}/fields:
+    get:
+      operationId: getDocumentFields
+      tags: [documents]
+      summary: Get signature field placements for a document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Signature fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignatureFieldsResponse"
+    put:
+      operationId: saveDocumentFields
+      tags: [documents]
+      summary: Save signature field placements (replaces all)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveFieldsRequest"
+      responses:
+        "200":
+          description: Fields saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
 
   /documents/{id}/send:
     post:
@@ -438,10 +510,13 @@ components:
           type: string
         email:
           type: string
+        hasSavedSignature:
+          type: boolean
       required:
         - id
         - name
         - email
+        - hasSavedSignature
 
     AuthResponse:
       type: object
@@ -464,6 +539,95 @@ components:
             - type: "null"
       required:
         - user
+
+    SavedSignatureResponse:
+      type: object
+      properties:
+        signatureData:
+          type: string
+          nullable: true
+      required:
+        - signatureData
+
+    SaveSignatureRequest:
+      type: object
+      properties:
+        signatureData:
+          type: string
+      required:
+        - signatureData
+
+    SignatureField:
+      type: object
+      properties:
+        id:
+          type: string
+        documentId:
+          type: string
+        recipientId:
+          type: string
+        page:
+          type: integer
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+      required:
+        - id
+        - documentId
+        - recipientId
+        - page
+        - x
+        - y
+        - width
+        - height
+
+    SignatureFieldInput:
+      type: object
+      properties:
+        recipientId:
+          type: string
+        page:
+          type: integer
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+      required:
+        - recipientId
+        - page
+        - x
+        - y
+        - width
+        - height
+
+    SignatureFieldsResponse:
+      type: object
+      properties:
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/SignatureField"
+      required:
+        - fields
+
+    SaveFieldsRequest:
+      type: object
+      properties:
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/SignatureFieldInput"
+      required:
+        - fields
 
     Recipient:
       type: object
@@ -574,9 +738,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Recipient"
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/SignatureField"
       required:
         - document
         - recipients
+        - fields
 
     RecipientInput:
       type: object
@@ -642,10 +811,15 @@ components:
           type: string
         alreadySigned:
           type: boolean
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/SignatureField"
       required:
         - recipient
         - documentTitle
         - alreadySigned
+        - fields
 
     SubmitSignatureRequest:
       type: object

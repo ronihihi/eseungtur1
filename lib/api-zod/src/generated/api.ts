@@ -31,6 +31,7 @@ export const RegisterResponse = zod.object({
     id: zod.string(),
     name: zod.string(),
     email: zod.string(),
+    hasSavedSignature: zod.boolean(),
   }),
 });
 
@@ -48,6 +49,7 @@ export const LoginResponse = zod.object({
     id: zod.string(),
     name: zod.string(),
     email: zod.string(),
+    hasSavedSignature: zod.boolean(),
   }),
 });
 
@@ -68,10 +70,29 @@ export const GetMeResponse = zod.object({
         id: zod.string(),
         name: zod.string(),
         email: zod.string(),
+        hasSavedSignature: zod.boolean(),
       }),
       zod.null(),
     ])
     .nullable(),
+});
+
+/**
+ * @summary Get the current user's saved signature
+ */
+export const GetSavedSignatureResponse = zod.object({
+  signatureData: zod.string().nullable(),
+});
+
+/**
+ * @summary Save a signature for the current user
+ */
+export const SaveSignatureBody = zod.object({
+  signatureData: zod.string(),
+});
+
+export const SaveSignatureResponse = zod.object({
+  success: zod.boolean(),
 });
 
 /**
@@ -145,6 +166,18 @@ export const GetDocumentResponse = zod.object({
       createdAt: zod.string(),
     }),
   ),
+  fields: zod.array(
+    zod.object({
+      id: zod.string(),
+      documentId: zod.string(),
+      recipientId: zod.string(),
+      page: zod.number(),
+      x: zod.number(),
+      y: zod.number(),
+      width: zod.number(),
+      height: zod.number(),
+    }),
+  ),
 });
 
 /**
@@ -179,6 +212,52 @@ export const SetRecipientsBody = zod.object({
 });
 
 export const SetRecipientsResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Get signature field placements for a document
+ */
+export const GetDocumentFieldsParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const GetDocumentFieldsResponse = zod.object({
+  fields: zod.array(
+    zod.object({
+      id: zod.string(),
+      documentId: zod.string(),
+      recipientId: zod.string(),
+      page: zod.number(),
+      x: zod.number(),
+      y: zod.number(),
+      width: zod.number(),
+      height: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Save signature field placements (replaces all)
+ */
+export const SaveDocumentFieldsParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const SaveDocumentFieldsBody = zod.object({
+  fields: zod.array(
+    zod.object({
+      recipientId: zod.string(),
+      page: zod.number(),
+      x: zod.number(),
+      y: zod.number(),
+      width: zod.number(),
+      height: zod.number(),
+    }),
+  ),
+});
+
+export const SaveDocumentFieldsResponse = zod.object({
   success: zod.boolean(),
 });
 
@@ -259,6 +338,18 @@ export const GetSigningInfoResponse = zod.object({
   }),
   documentTitle: zod.string(),
   alreadySigned: zod.boolean(),
+  fields: zod.array(
+    zod.object({
+      id: zod.string(),
+      documentId: zod.string(),
+      recipientId: zod.string(),
+      page: zod.number(),
+      x: zod.number(),
+      y: zod.number(),
+      width: zod.number(),
+      height: zod.number(),
+    }),
+  ),
 });
 
 /**

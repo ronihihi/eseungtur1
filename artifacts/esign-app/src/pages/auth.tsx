@@ -50,11 +50,11 @@ export function AuthPage() {
           queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
           setLocation("/");
         },
-        onError: (err) => {
+        onError: (err: unknown) => {
           toast({
             variant: "destructive",
             title: "Login failed",
-            description: err.error || "Please check your credentials and try again.",
+            description: (err as { error?: string })?.error || "Please check your credentials and try again.",
           });
         },
       }
@@ -69,11 +69,11 @@ export function AuthPage() {
           queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
           setLocation("/");
         },
-        onError: (err) => {
+        onError: (err: unknown) => {
           toast({
             variant: "destructive",
             title: "Registration failed",
-            description: err.error || "An error occurred during registration.",
+            description: (err as { error?: string })?.error || "An error occurred during registration.",
           });
         },
       }

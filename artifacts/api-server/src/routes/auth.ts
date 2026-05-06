@@ -13,6 +13,7 @@ declare module "express-session" {
     userId: string;
     userName: string;
     userEmail: string;
+    hasSavedSignature: boolean;
   }
 }
 
@@ -38,8 +39,9 @@ router.post("/auth/register", async (req: Request, res: Response) => {
     req.session.userId = id;
     req.session.userName = name;
     req.session.userEmail = email;
+    req.session.hasSavedSignature = false;
 
-    res.json({ success: true, user: { id, name, email } });
+    res.json({ success: true, user: { id, name, email, hasSavedSignature: false } });
   } catch (err) {
     req.log.error({ err }, "register error");
     res.status(500).json({ error: "Internal server error" });
@@ -70,8 +72,9 @@ router.post("/auth/login", async (req: Request, res: Response) => {
     req.session.userId = user.id;
     req.session.userName = user.name;
     req.session.userEmail = user.email;
+    req.session.hasSavedSignature = !!user.signatureData;
 
-    res.json({ success: true, user: { id: user.id, name: user.name, email: user.email } });
+    res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, hasSavedSignature: !!user.signatureData } });
   } catch (err) {
     req.log.error({ err }, "login error");
     res.status(500).json({ error: "Internal server error" });
@@ -95,8 +98,43 @@ router.get("/auth/me", (req: Request, res: Response) => {
       id: req.session.userId,
       name: req.session.userName,
       email: req.session.userEmail,
+      hasSavedSignature: !!req.session.hasSavedSignature,
     },
   });
+});
+
+router.get("/auth/me/signature", async (req: Request, res: Response) => {
+  if (!req.session.userId) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  try {
+    const users = await db.select({ signatureData: usersTable.signatureData }).from(usersTable).where(eq(usersTable.id, req.session.userId)).limit(1);
+    res.json({ signatureData: users[0]?.signatureData ?? null });
+  } catch (err) {
+    req.log.error({ err }, "get signature error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.put("/auth/me/signature", async (req: Request, res: Response) => {
+  if (!req.session.userId) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  const { signatureData } = req.body as { signatureData?: string };
+  if (!signatureData) {
+    res.status(400).json({ error: "signatureData is required" });
+    return;
+  }
+  try {
+    await db.update(usersTable).set({ signatureData }).where(eq(usersTable.id, req.session.userId));
+    req.session.hasSavedSignature = true;
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "save signature error");
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export default router;

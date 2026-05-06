@@ -3,8 +3,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
-import { eq, and, count } from "drizzle-orm";
-import { db, documentsTable, recipientsTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
+import { db, documentsTable, recipientsTable, signatureFieldsTable } from "@workspace/db";
 import type { Request, Response } from "express";
 
 const router: IRouter = Router();
@@ -47,10 +47,7 @@ router.get("/documents", requireAuth, async (req: Request, res: Response) => {
 
     const result = await Promise.all(
       docs.map(async (doc) => {
-        const recs = await db
-          .select()
-          .from(recipientsTable)
-          .where(eq(recipientsTable.documentId, doc.id));
+        const recs = await db.select().from(recipientsTable).where(eq(recipientsTable.documentId, doc.id));
         return {
           ...doc,
           totalRecipients: recs.length,
@@ -74,9 +71,9 @@ router.post("/documents", requireAuth, upload.single("document"), async (req: Re
       return;
     }
     const { title, signing_order } = req.body as { title?: string; signing_order?: string };
-    const id = uuidv4();
+    const newId = uuidv4();
     await db.insert(documentsTable).values({
-      id,
+      id: newId,
       title: title || req.file.originalname,
       filename: req.file.originalname,
       filepath: req.file.path,
@@ -85,7 +82,7 @@ router.post("/documents", requireAuth, upload.single("document"), async (req: Re
       signingOrder: signing_order === "sequential" ? "sequential" : "simultaneous",
       status: "draft",
     });
-    res.json({ success: true, documentId: id });
+    res.json({ success: true, documentId: newId });
   } catch (err) {
     req.log.error({ err }, "upload document error");
     res.status(500).json({ error: "Internal server error" });
@@ -93,11 +90,12 @@ router.post("/documents", requireAuth, upload.single("document"), async (req: Re
 });
 
 router.get("/documents/:id", requireAuth, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
   try {
     const docs = await db
       .select()
       .from(documentsTable)
-      .where(and(eq(documentsTable.id, req.params.id), eq(documentsTable.uploadedBy, req.session.userId!)))
+      .where(and(eq(documentsTable.id, id), eq(documentsTable.uploadedBy, req.session.userId!)))
       .limit(1);
 
     if (docs.length === 0) {
@@ -106,12 +104,10 @@ router.get("/documents/:id", requireAuth, async (req: Request, res: Response) =>
     }
 
     const doc = docs[0];
-    const recipients = await db
-      .select()
-      .from(recipientsTable)
-      .where(eq(recipientsTable.documentId, req.params.id));
-
+    const recipients = await db.select().from(recipientsTable).where(eq(recipientsTable.documentId, id));
     recipients.sort((a, b) => a.signOrder - b.signOrder);
+
+    const fields = await db.select().from(signatureFieldsTable).where(eq(signatureFieldsTable.documentId, id));
 
     res.json({
       document: {
@@ -120,6 +116,7 @@ router.get("/documents/:id", requireAuth, async (req: Request, res: Response) =>
         signedCount: recipients.filter((r) => r.status === "signed").length,
       },
       recipients,
+      fields,
     });
   } catch (err) {
     req.log.error({ err }, "get document error");
@@ -127,12 +124,13 @@ router.get("/documents/:id", requireAuth, async (req: Request, res: Response) =>
   }
 });
 
-router.delete("/documents/:id", requireAuth, async (req: Request, res: Response) => {
+router.get("/documents/:id/file", requireAuth, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
   try {
     const docs = await db
       .select()
       .from(documentsTable)
-      .where(and(eq(documentsTable.id, req.params.id), eq(documentsTable.uploadedBy, req.session.userId!)))
+      .where(and(eq(documentsTable.id, id), eq(documentsTable.uploadedBy, req.session.userId!)))
       .limit(1);
 
     if (docs.length === 0) {
@@ -140,8 +138,109 @@ router.delete("/documents/:id", requireAuth, async (req: Request, res: Response)
       return;
     }
 
-    await db.delete(recipientsTable).where(eq(recipientsTable.documentId, req.params.id));
-    await db.delete(documentsTable).where(eq(documentsTable.id, req.params.id));
+    const doc = docs[0];
+    if (!fs.existsSync(doc.filepath)) {
+      res.status(404).json({ error: "File not found on disk" });
+      return;
+    }
+
+    const ext = path.extname(doc.filepath).toLowerCase();
+    const contentType = ext === ".pdf" ? "application/pdf" : "application/octet-stream";
+    res.set("Content-Type", contentType);
+    res.set("Cache-Control", "private, max-age=300");
+    res.sendFile(path.resolve(doc.filepath));
+  } catch (err) {
+    req.log.error({ err }, "serve document file error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/documents/:id/fields", requireAuth, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  try {
+    const docs = await db
+      .select({ id: documentsTable.id })
+      .from(documentsTable)
+      .where(and(eq(documentsTable.id, id), eq(documentsTable.uploadedBy, req.session.userId!)))
+      .limit(1);
+
+    if (docs.length === 0) {
+      res.status(404).json({ error: "Document not found" });
+      return;
+    }
+
+    const fields = await db.select().from(signatureFieldsTable).where(eq(signatureFieldsTable.documentId, id));
+    res.json({ fields });
+  } catch (err) {
+    req.log.error({ err }, "get fields error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.put("/documents/:id/fields", requireAuth, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  try {
+    const docs = await db
+      .select({ id: documentsTable.id })
+      .from(documentsTable)
+      .where(and(eq(documentsTable.id, id), eq(documentsTable.uploadedBy, req.session.userId!)))
+      .limit(1);
+
+    if (docs.length === 0) {
+      res.status(404).json({ error: "Document not found" });
+      return;
+    }
+
+    const { fields } = req.body as {
+      fields: Array<{ recipientId: string; page: number; x: number; y: number; width: number; height: number }>;
+    };
+
+    if (!Array.isArray(fields)) {
+      res.status(400).json({ error: "fields must be an array" });
+      return;
+    }
+
+    await db.delete(signatureFieldsTable).where(eq(signatureFieldsTable.documentId, id));
+
+    if (fields.length > 0) {
+      await db.insert(signatureFieldsTable).values(
+        fields.map((f) => ({
+          id: uuidv4(),
+          documentId: id,
+          recipientId: f.recipientId,
+          page: f.page,
+          x: f.x,
+          y: f.y,
+          width: f.width,
+          height: f.height,
+        }))
+      );
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "save fields error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/documents/:id", requireAuth, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  try {
+    const docs = await db
+      .select()
+      .from(documentsTable)
+      .where(and(eq(documentsTable.id, id), eq(documentsTable.uploadedBy, req.session.userId!)))
+      .limit(1);
+
+    if (docs.length === 0) {
+      res.status(404).json({ error: "Document not found" });
+      return;
+    }
+
+    await db.delete(signatureFieldsTable).where(eq(signatureFieldsTable.documentId, id));
+    await db.delete(recipientsTable).where(eq(recipientsTable.documentId, id));
+    await db.delete(documentsTable).where(eq(documentsTable.id, id));
 
     res.json({ success: true });
   } catch (err) {
@@ -151,20 +250,11 @@ router.delete("/documents/:id", requireAuth, async (req: Request, res: Response)
 });
 
 router.get("/documents/:id/status", requireAuth, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
   try {
-    const docs = await db
-      .select()
-      .from(documentsTable)
-      .where(eq(documentsTable.id, req.params.id))
-      .limit(1);
-
-    const recipients = await db
-      .select()
-      .from(recipientsTable)
-      .where(eq(recipientsTable.documentId, req.params.id));
-
+    const docs = await db.select().from(documentsTable).where(eq(documentsTable.id, id)).limit(1);
+    const recipients = await db.select().from(recipientsTable).where(eq(recipientsTable.documentId, id));
     recipients.sort((a, b) => a.signOrder - b.signOrder);
-
     res.json({ recipients, status: docs[0]?.status ?? "unknown" });
   } catch (err) {
     req.log.error({ err }, "get document status error");

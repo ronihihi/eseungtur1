@@ -26,9 +26,13 @@ import type {
   LoginRequest,
   MeResponse,
   RegisterRequest,
+  SaveFieldsRequest,
+  SaveSignatureRequest,
+  SavedSignatureResponse,
   SendDocumentRequest,
   SendDocumentResponse,
   SetRecipientsRequest,
+  SignatureFieldsResponse,
   SigningInfoResponse,
   SubmitSignatureRequest,
   SuccessResponse,
@@ -435,6 +439,167 @@ export function useGetMe<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get the current user's saved signature
+ */
+export const getGetSavedSignatureUrl = () => {
+  return `/api/auth/me/signature`;
+};
+
+export const getSavedSignature = async (
+  options?: RequestInit,
+): Promise<SavedSignatureResponse> => {
+  return customFetch<SavedSignatureResponse>(getGetSavedSignatureUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSavedSignatureQueryKey = () => {
+  return [`/api/auth/me/signature`] as const;
+};
+
+export const getGetSavedSignatureQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSavedSignature>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSavedSignature>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetSavedSignatureQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSavedSignature>>
+  > = ({ signal }) => getSavedSignature({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSavedSignature>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSavedSignatureQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSavedSignature>>
+>;
+export type GetSavedSignatureQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current user's saved signature
+ */
+
+export function useGetSavedSignature<
+  TData = Awaited<ReturnType<typeof getSavedSignature>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSavedSignature>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSavedSignatureQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Save a signature for the current user
+ */
+export const getSaveSignatureUrl = () => {
+  return `/api/auth/me/signature`;
+};
+
+export const saveSignature = async (
+  saveSignatureRequest: SaveSignatureRequest,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getSaveSignatureUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(saveSignatureRequest),
+  });
+};
+
+export const getSaveSignatureMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveSignature>>,
+    TError,
+    { data: BodyType<SaveSignatureRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveSignature>>,
+  TError,
+  { data: BodyType<SaveSignatureRequest> },
+  TContext
+> => {
+  const mutationKey = ["saveSignature"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveSignature>>,
+    { data: BodyType<SaveSignatureRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return saveSignature(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveSignatureMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveSignature>>
+>;
+export type SaveSignatureMutationBody = BodyType<SaveSignatureRequest>;
+export type SaveSignatureMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Save a signature for the current user
+ */
+export const useSaveSignature = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveSignature>>,
+    TError,
+    { data: BodyType<SaveSignatureRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveSignature>>,
+  TError,
+  { data: BodyType<SaveSignatureRequest> },
+  TContext
+> => {
+  return useMutation(getSaveSignatureMutationOptions(options));
+};
 
 /**
  * @summary List all documents for the current user
@@ -861,6 +1026,180 @@ export const useSetRecipients = <
   TContext
 > => {
   return useMutation(getSetRecipientsMutationOptions(options));
+};
+
+/**
+ * @summary Get signature field placements for a document
+ */
+export const getGetDocumentFieldsUrl = (id: string) => {
+  return `/api/documents/${id}/fields`;
+};
+
+export const getDocumentFields = async (
+  id: string,
+  options?: RequestInit,
+): Promise<SignatureFieldsResponse> => {
+  return customFetch<SignatureFieldsResponse>(getGetDocumentFieldsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDocumentFieldsQueryKey = (id: string) => {
+  return [`/api/documents/${id}/fields`] as const;
+};
+
+export const getGetDocumentFieldsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDocumentFields>>,
+  TError = ErrorType<unknown>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDocumentFields>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetDocumentFieldsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDocumentFields>>
+  > = ({ signal }) => getDocumentFields(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDocumentFields>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDocumentFieldsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDocumentFields>>
+>;
+export type GetDocumentFieldsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get signature field placements for a document
+ */
+
+export function useGetDocumentFields<
+  TData = Awaited<ReturnType<typeof getDocumentFields>>,
+  TError = ErrorType<unknown>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDocumentFields>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDocumentFieldsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Save signature field placements (replaces all)
+ */
+export const getSaveDocumentFieldsUrl = (id: string) => {
+  return `/api/documents/${id}/fields`;
+};
+
+export const saveDocumentFields = async (
+  id: string,
+  saveFieldsRequest: SaveFieldsRequest,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getSaveDocumentFieldsUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(saveFieldsRequest),
+  });
+};
+
+export const getSaveDocumentFieldsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveDocumentFields>>,
+    TError,
+    { id: string; data: BodyType<SaveFieldsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveDocumentFields>>,
+  TError,
+  { id: string; data: BodyType<SaveFieldsRequest> },
+  TContext
+> => {
+  const mutationKey = ["saveDocumentFields"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveDocumentFields>>,
+    { id: string; data: BodyType<SaveFieldsRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return saveDocumentFields(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveDocumentFieldsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveDocumentFields>>
+>;
+export type SaveDocumentFieldsMutationBody = BodyType<SaveFieldsRequest>;
+export type SaveDocumentFieldsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Save signature field placements (replaces all)
+ */
+export const useSaveDocumentFields = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveDocumentFields>>,
+    TError,
+    { id: string; data: BodyType<SaveFieldsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveDocumentFields>>,
+  TError,
+  { id: string; data: BodyType<SaveFieldsRequest> },
+  TContext
+> => {
+  return useMutation(getSaveDocumentFieldsMutationOptions(options));
 };
 
 /**

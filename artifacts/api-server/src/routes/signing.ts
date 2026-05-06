@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, documentsTable, recipientsTable } from "@workspace/db";
+import { db, documentsTable, recipientsTable, signatureFieldsTable } from "@workspace/db";
+import fs from "fs";
+import path from "path";
 import { SubmitSignatureBody } from "@workspace/api-zod";
 import type { Request, Response } from "express";
 import { sendSigningEmail } from "./emailService.js";
@@ -8,11 +10,12 @@ import { sendSigningEmail } from "./emailService.js";
 const router: IRouter = Router();
 
 router.get("/sign/:token", async (req: Request, res: Response) => {
+  const token = req.params.token as string;
   try {
     const recs = await db
       .select()
       .from(recipientsTable)
-      .where(eq(recipientsTable.token, req.params.token))
+      .where(eq(recipientsTable.token, token))
       .limit(1);
 
     if (recs.length === 0) {
@@ -28,13 +31,19 @@ router.get("/sign/:token", async (req: Request, res: Response) => {
       await db
         .update(recipientsTable)
         .set({ status: "viewed", viewedAt: new Date() })
-        .where(eq(recipientsTable.token, req.params.token));
+        .where(eq(recipientsTable.token, token));
     }
+
+    const fields = await db
+      .select()
+      .from(signatureFieldsTable)
+      .where(eq(signatureFieldsTable.recipientId, r.id));
 
     res.json({
       recipient: r,
       documentTitle: doc?.title ?? "Unknown Document",
       alreadySigned: r.status === "signed",
+      fields,
     });
   } catch (err) {
     req.log.error({ err }, "get signing info error");
@@ -43,6 +52,7 @@ router.get("/sign/:token", async (req: Request, res: Response) => {
 });
 
 router.post("/sign/:token", async (req: Request, res: Response) => {
+  const token = req.params.token as string;
   try {
     const parsed = SubmitSignatureBody.safeParse(req.body);
     if (!parsed.success) {
@@ -55,7 +65,7 @@ router.post("/sign/:token", async (req: Request, res: Response) => {
     const recs = await db
       .select()
       .from(recipientsTable)
-      .where(eq(recipientsTable.token, req.params.token))
+      .where(eq(recipientsTable.token, token))
       .limit(1);
 
     if (recs.length === 0) {
@@ -81,7 +91,7 @@ router.post("/sign/:token", async (req: Request, res: Response) => {
         ipAddress: ip,
         signatureData,
       })
-      .where(eq(recipientsTable.token, req.params.token));
+      .where(eq(recipientsTable.token, token));
 
     const docs = await db.select().from(documentsTable).where(eq(documentsTable.id, r.documentId)).limit(1);
     const doc = docs[0];
@@ -118,6 +128,42 @@ router.post("/sign/:token", async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (err) {
     req.log.error({ err }, "submit signature error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/sign/:token/file", async (req: Request, res: Response) => {
+  const token = req.params.token as string;
+  try {
+    const recs = await db
+      .select()
+      .from(recipientsTable)
+      .where(eq(recipientsTable.token, token))
+      .limit(1);
+
+    if (recs.length === 0) {
+      res.status(404).json({ error: "Invalid signing link" });
+      return;
+    }
+
+    const doc = await db
+      .select()
+      .from(documentsTable)
+      .where(eq(documentsTable.id, recs[0].documentId))
+      .limit(1);
+
+    if (!doc[0] || !fs.existsSync(doc[0].filepath)) {
+      res.status(404).json({ error: "File not found" });
+      return;
+    }
+
+    const ext = path.extname(doc[0].filepath).toLowerCase();
+    const contentType = ext === ".pdf" ? "application/pdf" : "application/octet-stream";
+    res.set("Content-Type", contentType);
+    res.set("Cache-Control", "private, max-age=300");
+    res.sendFile(path.resolve(doc[0].filepath));
+  } catch (err) {
+    req.log.error({ err }, "serve sign file error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

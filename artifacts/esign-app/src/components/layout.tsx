@@ -1,9 +1,10 @@
 import { useLogout, useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
-import { LogOut, FileSignature, LayoutDashboard, Plus } from "lucide-react";
+import { LogOut, FileSignature, LayoutDashboard, Plus, PenLine } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { SavedSignatureDialog } from "@/components/saved-signature-dialog";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -64,6 +65,11 @@ export function Layout({ children }: LayoutProps) {
               </Avatar>
               <span className="font-medium text-foreground">{me?.user?.name}</span>
             </div>
+            <SavedSignatureDialog>
+              <Button variant="ghost" size="icon" title="My saved signature">
+                <PenLine className="h-4 w-4" />
+              </Button>
+            </SavedSignatureDialog>
             <Button variant="ghost" size="icon" onClick={handleLogout} title="Log out">
               <LogOut className="h-4 w-4" />
             </Button>

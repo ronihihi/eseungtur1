@@ -33,6 +33,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  hasSavedSignature: boolean;
 }
 
 export interface AuthResponse {
@@ -42,6 +43,42 @@ export interface AuthResponse {
 
 export interface MeResponse {
   user: User | null;
+}
+
+export interface SavedSignatureResponse {
+  signatureData: string | null;
+}
+
+export interface SaveSignatureRequest {
+  signatureData: string;
+}
+
+export interface SignatureField {
+  id: string;
+  documentId: string;
+  recipientId: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SignatureFieldInput {
+  recipientId: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SignatureFieldsResponse {
+  fields: SignatureField[];
+}
+
+export interface SaveFieldsRequest {
+  fields: SignatureFieldInput[];
 }
 
 export type RecipientStatus =
@@ -110,6 +147,7 @@ export interface UploadDocumentResponse {
 export interface DocumentDetailResponse {
   document: Document;
   recipients: Recipient[];
+  fields: SignatureField[];
 }
 
 export interface RecipientInput {
@@ -141,6 +179,7 @@ export interface SigningInfoResponse {
   recipient: Recipient;
   documentTitle: string;
   alreadySigned: boolean;
+  fields: SignatureField[];
 }
 
 export interface SubmitSignatureRequest {

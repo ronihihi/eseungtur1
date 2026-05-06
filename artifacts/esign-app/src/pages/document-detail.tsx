@@ -4,7 +4,10 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { ArrowLeft, Send, Plus, Trash2, Mail, CheckCircle2, Clock, BellRing, Copy, Check } from "lucide-react";
+import {
+  ArrowLeft, Send, Plus, Trash2, Mail, CheckCircle2,
+  Clock, BellRing, Copy, Check, MousePointerClick, Save, FileText,
+} from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -15,25 +18,50 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader,
+  DialogTitle, DialogFooter, DialogTrigger,
+} from "@/components/ui/dialog";
+import { PdfViewer } from "@/components/pdf-viewer";
 
-import { 
-  useGetDocument, 
-  getGetDocumentQueryKey, 
-  useSetRecipients, 
+import {
+  useGetDocument,
+  getGetDocumentQueryKey,
+  useSetRecipients,
   useSendDocument,
   useRemindRecipient,
-  useGetDocumentStatus
+  useGetDocumentStatus,
+  getGetDocumentStatusQueryKey,
+  useSaveDocumentFields,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
+const RECIPIENT_COLORS = [
+  { bg: "rgba(59,130,246,0.15)", border: "#3b82f6", text: "#1d4ed8" },
+  { bg: "rgba(16,185,129,0.15)", border: "#10b981", text: "#065f46" },
+  { bg: "rgba(245,158,11,0.15)", border: "#f59e0b", text: "#78350f" },
+  { bg: "rgba(239,68,68,0.15)", border: "#ef4444", text: "#991b1b" },
+  { bg: "rgba(168,85,247,0.15)", border: "#a855f7", text: "#6b21a8" },
+  { bg: "rgba(20,184,166,0.15)", border: "#14b8a6", text: "#0f766e" },
+  { bg: "rgba(249,115,22,0.15)", border: "#f97316", text: "#9a3412" },
+];
+
+interface FieldItem {
+  id: string;
+  documentId: string;
+  recipientId: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 const recipientsSchema = z.object({
-  recipients: z.array(
-    z.object({
-      teamName: z.string().min(1, "Name is required"),
-      email: z.string().email("Valid email required"),
-    })
-  ).min(1, "At least one recipient is required").max(7, "Maximum 7 recipients allowed"),
+  recipients: z
+    .array(z.object({ teamName: z.string().min(1, "Name is required"), email: z.string().email("Valid email required") }))
+    .min(1, "At least one recipient is required")
+    .max(7, "Maximum 7 recipients allowed"),
 });
 
 const sendSchema = z.object({
@@ -45,62 +73,46 @@ export function DocumentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
-  // Real-time polling when document is sent
+
   const { data: detailData, isLoading } = useGetDocument(id, {
-    query: {
-      enabled: !!id,
-      queryKey: getGetDocumentQueryKey(id),
-    }
+    query: { enabled: !!id, queryKey: getGetDocumentQueryKey(id) },
   });
 
   const doc = detailData?.document;
+  const recipients = detailData?.recipients ?? [];
   const isDraft = doc?.status === "draft";
   const isSent = doc?.status === "sent";
 
-  // Polling hook (only active if sent)
-  useGetDocumentStatus(id, {
-    query: {
-      enabled: isSent,
-      refetchInterval: 5000,
-    }
-  });
+  useGetDocumentStatus(id, { query: { enabled: isSent, refetchInterval: 5000, queryKey: getGetDocumentStatusQueryKey(id) } });
 
   const setRecipientsMutation = useSetRecipients();
   const sendDocumentMutation = useSendDocument();
   const remindMutation = useRemindRecipient();
+  const saveFieldsMutation = useSaveDocumentFields();
 
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [selectedRecipientId, setSelectedRecipientId] = useState<string>("");
+  const [localFields, setLocalFields] = useState<FieldItem[]>([]);
+  const [fieldsDirty, setFieldsDirty] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [numPages, setNumPages] = useState(1);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof recipientsSchema>>({
     resolver: zodResolver(recipientsSchema),
-    defaultValues: {
-      recipients: [{ teamName: "", email: "" }],
-    },
+    defaultValues: { recipients: [{ teamName: "", email: "" }] },
   });
 
   const sendForm = useForm<z.infer<typeof sendSchema>>({
     resolver: zodResolver(sendSchema),
-    defaultValues: {
-      subject: "",
-      message: "",
-    }
+    defaultValues: { subject: "", message: "" },
   });
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "recipients",
-  });
+  const { fields: formFields, append, remove } = useFieldArray({ control: form.control, name: "recipients" });
 
-  // Pre-fill form when data loads
   useEffect(() => {
     if (detailData?.recipients && detailData.recipients.length > 0 && isDraft) {
-      form.reset({
-        recipients: detailData.recipients.map(r => ({
-          teamName: r.teamName,
-          email: r.email,
-        }))
-      });
+      form.reset({ recipients: detailData.recipients.map((r) => ({ teamName: r.teamName, email: r.email })) });
     }
   }, [detailData, isDraft, form]);
 
@@ -108,10 +120,75 @@ export function DocumentDetailPage() {
     if (doc?.title) {
       sendForm.reset({
         subject: `Signature Request: ${doc.title}`,
-        message: `Please review and sign the document "${doc.title}".`
+        message: `Please review and sign the document "${doc.title}".`,
       });
     }
   }, [doc?.title, sendForm]);
+
+  useEffect(() => {
+    if (detailData?.fields) {
+      setLocalFields(detailData.fields as FieldItem[]);
+      setFieldsDirty(false);
+    }
+  }, [detailData?.fields]);
+
+  useEffect(() => {
+    if (recipients.length > 0 && !selectedRecipientId) {
+      setSelectedRecipientId(recipients[0].id);
+    }
+  }, [recipients, selectedRecipientId]);
+
+  const getRecipientColor = (recipientId: string) => {
+    const idx = recipients.findIndex((r) => r.id === recipientId);
+    return RECIPIENT_COLORS[idx >= 0 ? idx % RECIPIENT_COLORS.length : 0];
+  };
+
+  const handlePdfClick = (x: number, y: number) => {
+    if (!isDraft || !selectedRecipientId) return;
+    const newField: FieldItem = {
+      id: `temp-${Date.now()}-${Math.random()}`,
+      documentId: id,
+      recipientId: selectedRecipientId,
+      page: currentPage,
+      x,
+      y,
+      width: 0.28,
+      height: 0.065,
+    };
+    setLocalFields((prev) => [...prev, newField]);
+    setFieldsDirty(true);
+  };
+
+  const removeField = (fieldId: string) => {
+    setLocalFields((prev) => prev.filter((f) => f.id !== fieldId));
+    setFieldsDirty(true);
+  };
+
+  const handleSaveFields = () => {
+    saveFieldsMutation.mutate(
+      {
+        id,
+        data: {
+          fields: localFields.map((f) => ({
+            recipientId: f.recipientId,
+            page: f.page,
+            x: f.x,
+            y: f.y,
+            width: f.width,
+            height: f.height,
+          })),
+        },
+      },
+      {
+        onSuccess: () => {
+          setFieldsDirty(false);
+          queryClient.invalidateQueries({ queryKey: getGetDocumentQueryKey(id) });
+          toast({ title: "Signature fields saved" });
+        },
+        onError: () => toast({ variant: "destructive", title: "Failed to save fields" }),
+      }
+    );
+  };
 
   const onSaveRecipients = (values: z.infer<typeof recipientsSchema>) => {
     setRecipientsMutation.mutate(
@@ -121,9 +198,7 @@ export function DocumentDetailPage() {
           queryClient.invalidateQueries({ queryKey: getGetDocumentQueryKey(id) });
           toast({ title: "Recipients saved" });
         },
-        onError: (err) => {
-          toast({ variant: "destructive", title: "Error saving recipients", description: err.error });
-        }
+        onError: (err: unknown) => toast({ variant: "destructive", title: "Error saving recipients", description: (err as { error?: string })?.error }),
       }
     );
   };
@@ -137,9 +212,7 @@ export function DocumentDetailPage() {
           setSendDialogOpen(false);
           toast({ title: "Document sent successfully!" });
         },
-        onError: (err) => {
-          toast({ variant: "destructive", title: "Failed to send", description: err.error });
-        }
+        onError: (err: unknown) => toast({ variant: "destructive", title: "Failed to send", description: (err as { error?: string })?.error }),
       }
     );
   };
@@ -149,13 +222,11 @@ export function DocumentDetailPage() {
       { recipientId },
       {
         onSuccess: () => toast({ title: "Reminder sent" }),
-        onError: (err) => toast({ variant: "destructive", title: "Failed to send reminder", description: err.error }),
+        onError: (err: unknown) => toast({ variant: "destructive", title: "Failed to send reminder", description: (err as { error?: string })?.error }),
       }
     );
   };
 
-  const [copiedLink, setCopiedLink] = useState<string | null>(null);
-  
   const handleCopyLink = (token: string) => {
     const url = `${window.location.origin}/sign/${token}`;
     navigator.clipboard.writeText(url).then(() => {
@@ -165,11 +236,57 @@ export function DocumentDetailPage() {
     });
   };
 
+  const renderFieldOverlay = () => (
+    <>
+      {localFields
+        .filter((f) => f.page === currentPage)
+        .map((f) => {
+          const color = getRecipientColor(f.recipientId);
+          const recipient = recipients.find((r) => r.id === f.recipientId);
+          return (
+            <div
+              key={f.id}
+              className="absolute pointer-events-auto flex items-center justify-center rounded"
+              style={{
+                left: `${f.x * 100}%`,
+                top: `${f.y * 100}%`,
+                width: `${f.width * 100}%`,
+                height: `${f.height * 100}%`,
+                background: color.bg,
+                border: `2px dashed ${color.border}`,
+                cursor: isDraft ? "pointer" : "default",
+              }}
+              title={isDraft ? `Click to remove "${recipient?.teamName}" field` : recipient?.teamName}
+              onClick={(e) => {
+                if (isDraft) {
+                  e.stopPropagation();
+                  removeField(f.id);
+                }
+              }}
+            >
+              <span
+                className="text-[10px] font-semibold truncate px-1 leading-none select-none"
+                style={{ color: color.text }}
+              >
+                ✎ {recipient?.teamName || "?"}
+              </span>
+            </div>
+          );
+        })}
+    </>
+  );
+
   if (isLoading) {
     return (
-      <div className="space-y-6 max-w-4xl mx-auto">
+      <div className="space-y-6 max-w-7xl mx-auto">
         <Skeleton className="h-8 w-1/3" />
-        <Skeleton className="h-64 w-full" />
+        <div className="grid lg:grid-cols-[1fr_340px] gap-6">
+          <Skeleton className="h-[600px] w-full" />
+          <div className="space-y-4">
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -178,15 +295,17 @@ export function DocumentDetailPage() {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold">Document not found</h2>
-        <Link href="/">
-          <Button variant="link" className="mt-4">Return to dashboard</Button>
-        </Link>
+        <Link href="/"><Button variant="link" className="mt-4">Return to dashboard</Button></Link>
       </div>
     );
   }
 
+  const pdfUrl = { url: `/api/documents/${id}/file`, withCredentials: true };
+  const isPdf = doc.filename.toLowerCase().endsWith(".pdf");
+
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Header */}
       <div>
         <Link href="/" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-primary mb-4 transition-colors">
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -194,22 +313,21 @@ export function DocumentDetailPage() {
         </Link>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{doc.title}</h1>
-            <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
+            <h1 className="text-2xl font-bold tracking-tight">{doc.title}</h1>
+            <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
               <span>{doc.filename}</span>
               <span>•</span>
-              <span>{format(new Date(doc.createdAt), "MMM d, yyyy h:mm a")}</span>
+              <span>{format(new Date(doc.createdAt), "MMM d, yyyy")}</span>
               <span>•</span>
-              <span className="capitalize">{doc.signingOrder} order</span>
+              <span className="capitalize">{doc.signingOrder}</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <StatusBadge status={doc.status} />
-            
             {isDraft && (
               <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button disabled={!detailData?.recipients?.length || setRecipientsMutation.isPending}>
+                  <Button disabled={!detailData?.recipients?.length}>
                     <Send className="mr-2 h-4 w-4" />
                     Send for Signature
                   </Button>
@@ -218,39 +336,27 @@ export function DocumentDetailPage() {
                   <DialogHeader>
                     <DialogTitle>Send Document</DialogTitle>
                     <DialogDescription>
-                      This will email the signature link to all configured recipients.
+                      Each recipient will receive a unique email with their personal signing link.
                     </DialogDescription>
                   </DialogHeader>
                   <Form {...sendForm}>
                     <form onSubmit={sendForm.handleSubmit(onSendDocument)} className="space-y-4 py-4">
-                      <FormField
-                        control={sendForm.control}
-                        name="subject"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email Subject</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={sendForm.control}
-                        name="message"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Message (Optional)</FormLabel>
-                            <FormControl>
-                              <Textarea rows={4} {...field} />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
+                      <FormField control={sendForm.control} name="subject" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email Subject</FormLabel>
+                          <FormControl><Input {...field} /></FormControl>
+                        </FormItem>
+                      )} />
+                      <FormField control={sendForm.control} name="message" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Message (Optional)</FormLabel>
+                          <FormControl><Textarea rows={4} {...field} /></FormControl>
+                        </FormItem>
+                      )} />
                       <DialogFooter>
                         <Button variant="outline" type="button" onClick={() => setSendDialogOpen(false)}>Cancel</Button>
                         <Button type="submit" disabled={sendDocumentMutation.isPending}>
-                          {sendDocumentMutation.isPending ? "Sending..." : "Send Now"}
+                          {sendDocumentMutation.isPending ? "Sending…" : "Send Now"}
                         </Button>
                       </DialogFooter>
                     </form>
@@ -262,186 +368,283 @@ export function DocumentDetailPage() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-[1fr_350px] gap-6 items-start">
-        <div className="space-y-6">
-          {/* Main content area */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recipients</CardTitle>
-              <CardDescription>
-                {isDraft 
-                  ? "Configure who needs to sign this document." 
-                  : "Track the signature status of each recipient."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isDraft ? (
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSaveRecipients)} className="space-y-6">
-                    <div className="space-y-4">
-                      {fields.map((field, index) => (
-                        <div key={field.id} className="flex gap-4 items-start bg-muted/30 p-4 rounded-lg border border-border/50">
-                          {doc.signingOrder === "sequential" && (
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">
-                              {index + 1}
-                            </div>
-                          )}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
-                            <FormField
-                              control={form.control}
-                              name={`recipients.${index}.teamName`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Name / Role</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="e.g., Client or Jane Doe" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
+      {/* Main Layout */}
+      <div className="grid lg:grid-cols-[1fr_340px] gap-6 items-start">
+        {/* Left: PDF Viewer */}
+        <div className="space-y-3">
+          {isPdf ? (
+            <>
+              {isDraft && selectedRecipientId && (
+                <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm">
+                  <MousePointerClick className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-muted-foreground">
+                    Click anywhere on the PDF to place a{" "}
+                    <strong style={{ color: getRecipientColor(selectedRecipientId).text }}>
+                      {recipients.find((r) => r.id === selectedRecipientId)?.teamName}
+                    </strong>{" "}
+                    signature field. Click an existing field to remove it.
+                  </span>
+                </div>
+              )}
+              {isDraft && !selectedRecipientId && recipients.length === 0 && (
+                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg text-sm text-muted-foreground">
+                  <MousePointerClick className="h-4 w-4 shrink-0" />
+                  Add recipients first, then click the PDF to place their signature fields.
+                </div>
+              )}
+              <PdfViewer
+                fileUrl={pdfUrl}
+                currentPage={currentPage}
+                numPages={numPages}
+                onLoadSuccess={setNumPages}
+                onPageChange={setCurrentPage}
+                onCanvasClick={handlePdfClick}
+                renderOverlay={renderFieldOverlay}
+                clickable={isDraft && !!selectedRecipientId}
+              />
+              {fieldsDirty && (
+                <Button onClick={handleSaveFields} disabled={saveFieldsMutation.isPending} className="w-full" variant="secondary">
+                  <Save className="mr-2 h-4 w-4" />
+                  {saveFieldsMutation.isPending ? "Saving…" : "Save Signature Fields"}
+                </Button>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
+                <FileText className="h-10 w-10 mb-3" />
+                <p className="font-medium">PDF preview not available for this file type</p>
+                <p className="text-sm mt-1">{doc.filename}</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Right: Controls Panel */}
+        <div className="space-y-5">
+          {isDraft ? (
+            <>
+              {/* Field Placement Controls */}
+              {recipients.length > 0 && isPdf && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Place Signature Fields</CardTitle>
+                    <CardDescription className="text-xs">
+                      Select a person, then click the PDF where they should sign.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {recipients.map((r, idx) => {
+                      const color = RECIPIENT_COLORS[idx % RECIPIENT_COLORS.length];
+                      const fieldCount = localFields.filter((f) => f.recipientId === r.id).length;
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => setSelectedRecipientId(r.id)}
+                          className={`w-full flex items-center justify-between p-3 rounded-lg border-2 text-left transition-colors ${
+                            selectedRecipientId === r.id
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/40"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="h-3 w-3 rounded-full shrink-0"
+                              style={{ background: color.border }}
                             />
+                            <span className="text-sm font-medium">{r.teamName}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {fieldCount} field{fieldCount !== 1 ? "s" : ""}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Recipients Form */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Recipients</CardTitle>
+                  <CardDescription className="text-xs">Up to 7 people who need to sign.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSaveRecipients)} className="space-y-4">
+                      <div className="space-y-3">
+                        {formFields.map((field, index) => (
+                          <div
+                            key={field.id}
+                            className="space-y-2 p-3 rounded-lg border bg-muted/20"
+                          >
+                            {doc.signingOrder === "sequential" && (
+                              <div
+                                className="h-5 w-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                                style={{ background: RECIPIENT_COLORS[index % RECIPIENT_COLORS.length].border }}
+                              >
+                                {index + 1}
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <FormField
+                                control={form.control}
+                                name={`recipients.${index}.teamName`}
+                                render={({ field }) => (
+                                  <FormItem className="flex-1">
+                                    <FormControl>
+                                      <Input placeholder="Name / Role" {...field} className="text-sm h-8" />
+                                    </FormControl>
+                                    <FormMessage className="text-xs" />
+                                  </FormItem>
+                                )}
+                              />
+                              {formFields.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  onClick={() => remove(index)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
                             <FormField
                               control={form.control}
                               name={`recipients.${index}.email`}
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Email</FormLabel>
                                   <FormControl>
-                                    <Input type="email" placeholder="jane@example.com" {...field} />
+                                    <Input type="email" placeholder="email@example.com" {...field} className="text-sm h-8" />
                                   </FormControl>
-                                  <FormMessage />
+                                  <FormMessage className="text-xs" />
                                 </FormItem>
                               )}
                             />
                           </div>
-                          {fields.length > 1 && (
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="icon" 
-                              className="mt-8 text-muted-foreground hover:text-destructive"
-                              onClick={() => remove(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => append({ teamName: "", email: "" })}
+                          disabled={formFields.length >= 7}
+                        >
+                          <Plus className="mr-1 h-3.5 w-3.5" />
+                          Add ({formFields.length}/7)
+                        </Button>
+                        <Button type="submit" size="sm" disabled={setRecipientsMutation.isPending}>
+                          {setRecipientsMutation.isPending ? "Saving…" : "Save Recipients"}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              {/* Summary */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Progress</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Signatures</span>
+                    <span className="font-semibold">{doc.signedCount} / {doc.totalRecipients}</span>
+                  </div>
+                  <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-500"
+                      style={{ width: `${doc.totalRecipients > 0 ? (doc.signedCount / doc.totalRecipients) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Uploaded by</span>
+                      <span className="font-medium">{doc.uploaderName}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Created</span>
+                      <span className="font-medium">{format(new Date(doc.createdAt), "MMM d, yyyy")}</span>
+                    </div>
+                    {doc.completedAt && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Completed</span>
+                        <span className="font-medium">{format(new Date(doc.completedAt), "MMM d, yyyy")}</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
-                    <div className="flex items-center justify-between">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => append({ teamName: "", email: "" })}
-                        disabled={fields.length >= 7}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Recipient {fields.length}/7
-                      </Button>
-                      
-                      <Button type="submit" disabled={setRecipientsMutation.isPending}>
-                        {setRecipientsMutation.isPending ? "Saving..." : "Save Recipients"}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              ) : (
-                <div className="space-y-4">
-                  {detailData?.recipients.map((recipient, idx) => (
-                    <div key={recipient.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border bg-card hover:bg-muted/10 transition-colors">
-                      <div className="flex items-center gap-4">
-                        {doc.signingOrder === "sequential" && (
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground font-medium text-sm">
-                            {idx + 1}
-                          </div>
-                        )}
-                        <div>
-                          <div className="font-medium flex items-center gap-2">
-                            {recipient.teamName}
-                            {recipient.status === "signed" && recipient.signerName && (
-                              <span className="text-xs font-normal text-muted-foreground">(Signed by {recipient.signerName})</span>
+              {/* Recipients Status */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Signers</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {recipients.map((recipient, idx) => (
+                      <div key={recipient.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {doc.signingOrder === "sequential" && (
+                            <div
+                              className="h-5 w-5 shrink-0 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                              style={{ background: RECIPIENT_COLORS[idx % RECIPIENT_COLORS.length].border }}
+                            >
+                              {idx + 1}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">{recipient.teamName}</div>
+                            <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                              <Mail className="h-3 w-3 shrink-0" />{recipient.email}
+                            </div>
+                            {recipient.signerName && (
+                              <div className="text-xs text-muted-foreground">Signed by {recipient.signerName}</div>
                             )}
                           </div>
-                          <div className="text-sm text-muted-foreground flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {recipient.email}
-                          </div>
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-4 sm:ml-auto">
-                        <RecipientStatusBadge status={recipient.status} date={recipient.signedAt || recipient.viewedAt} />
-                        
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
+                        <div className="flex items-center gap-2 shrink-0">
+                          <RecipientStatusBadge status={recipient.status} date={recipient.signedAt ?? recipient.viewedAt} />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
                             title="Copy signing link"
                             onClick={() => handleCopyLink(recipient.token)}
                           >
-                            {copiedLink === recipient.token ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                            {copiedLink === recipient.token ? (
+                              <Check className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
                           </Button>
-                          
                           {recipient.status !== "signed" && (
-                            <Button 
-                              variant="secondary" 
-                              size="sm"
-                              className="hidden sm:flex"
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-7 w-7"
+                              title="Send reminder"
                               onClick={() => handleRemind(recipient.id)}
                               disabled={remindMutation.isPending}
                             >
-                              <BellRing className="mr-2 h-4 w-4" />
-                              Remind
+                              <BellRing className="h-3 w-3" />
                             </Button>
                           )}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Progress</span>
-                <span className="font-medium">{doc.signedCount} / {doc.totalRecipients} Signed</span>
-              </div>
-              <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-primary transition-all duration-500" 
-                  style={{ width: `${doc.totalRecipients > 0 ? (doc.signedCount / doc.totalRecipients) * 100 : 0}%` }}
-                />
-              </div>
-              <Separator />
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Uploaded by</span>
-                  <span className="font-medium text-right">{doc.uploaderName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Created</span>
-                  <span className="font-medium text-right">{format(new Date(doc.createdAt), "MMM d, yyyy")}</span>
-                </div>
-                {doc.completedAt && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Completed</span>
-                    <span className="font-medium text-right">{format(new Date(doc.completedAt), "MMM d, yyyy")}</span>
+                    ))}
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -452,59 +655,50 @@ function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case "completed":
       return (
-        <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white border-transparent">
-          <CheckCircle2 className="mr-1 h-3 w-3" />
-          Completed
+        <Badge className="bg-green-500 hover:bg-green-600 text-white border-transparent">
+          <CheckCircle2 className="mr-1 h-3 w-3" /> Completed
         </Badge>
       );
     case "sent":
       return (
-        <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 border-transparent">
-          <Send className="mr-1 h-3 w-3" />
-          Out for Signature
+        <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-transparent">
+          <Send className="mr-1 h-3 w-3" /> Out for Signature
         </Badge>
       );
-    case "draft":
     default:
       return (
         <Badge variant="outline" className="text-muted-foreground">
-          <FileText className="mr-1 h-3 w-3" />
-          Draft
+          <FileText className="mr-1 h-3 w-3" /> Draft
         </Badge>
       );
   }
 }
 
-function RecipientStatusBadge({ status, date }: { status: string, date?: string | null }) {
-  const formattedDate = date ? format(new Date(date), "MMM d, h:mm a") : "";
-  
+function RecipientStatusBadge({ status, date }: { status: string; date?: string | null }) {
+  const formatted = date ? format(new Date(date), "MMM d, h:mm a") : "";
   switch (status) {
     case "signed":
       return (
-        <div className="flex flex-col items-end">
-          <Badge variant="default" className="bg-green-500/10 text-green-700 hover:bg-green-500/20 border-transparent">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            Signed
+        <div className="text-right">
+          <Badge className="bg-green-500/10 text-green-700 border-transparent text-[10px]">
+            <CheckCircle2 className="mr-1 h-2.5 w-2.5" /> Signed
           </Badge>
-          {formattedDate && <span className="text-[10px] text-muted-foreground mt-1">{formattedDate}</span>}
+          {formatted && <div className="text-[9px] text-muted-foreground mt-0.5">{formatted}</div>}
         </div>
       );
     case "viewed":
       return (
-        <div className="flex flex-col items-end">
-          <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border-transparent">
-            <Clock className="mr-1 h-3 w-3" />
-            Viewed
+        <div className="text-right">
+          <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-transparent text-[10px]">
+            <Clock className="mr-1 h-2.5 w-2.5" /> Viewed
           </Badge>
-          {formattedDate && <span className="text-[10px] text-muted-foreground mt-1">{formattedDate}</span>}
+          {formatted && <div className="text-[9px] text-muted-foreground mt-0.5">{formatted}</div>}
         </div>
       );
-    case "pending":
     default:
       return (
-        <Badge variant="outline" className="text-muted-foreground">
-          <Clock className="mr-1 h-3 w-3" />
-          Pending
+        <Badge variant="outline" className="text-muted-foreground text-[10px]">
+          <Clock className="mr-1 h-2.5 w-2.5" /> Pending
         </Badge>
       );
   }

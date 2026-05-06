@@ -36,8 +36,8 @@ export function DashboardPage() {
           queryClient.invalidateQueries({ queryKey: getListDocumentsQueryKey() });
           toast({ title: "Document deleted successfully" });
         },
-        onError: (err) => {
-          toast({ variant: "destructive", title: "Error deleting document", description: err.error });
+        onError: (err: unknown) => {
+          toast({ variant: "destructive", title: "Error deleting document", description: (err as { error?: string })?.error });
         },
       }
     );
