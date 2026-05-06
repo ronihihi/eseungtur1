@@ -1,0 +1,23 @@
+import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
+
+export const documentsTable = pgTable("documents", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  filename: text("filename").notNull(),
+  filepath: text("filepath").notNull(),
+  uploadedBy: text("uploaded_by").notNull(),
+  uploaderName: text("uploader_name").notNull(),
+  signingOrder: text("signing_order").notNull().default("simultaneous"),
+  status: text("status").notNull().default("draft"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertDocumentSchema = createInsertSchema(documentsTable).omit({
+  createdAt: true,
+  completedAt: true,
+});
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type Document = typeof documentsTable.$inferSelect;

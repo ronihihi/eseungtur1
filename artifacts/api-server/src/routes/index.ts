@@ -1,8 +1,16 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import authRouter from "./auth";
+import documentsRouter from "./documents";
+import recipientsRouter from "./recipients";
+import signingRouter from "./signing";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(authRouter);
+router.use(documentsRouter);
+router.use(recipientsRouter);
+router.use(signingRouter);
 
 export default router;

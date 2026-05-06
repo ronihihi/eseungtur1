@@ -1,0 +1,19 @@
+{
+  "name": "esign-workflow",
+  "version": "1.0.0",
+  "description": "E-Signature Workflow App for 7 Teams",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "multer": "^1.4.5-lts.1",
+    "nedb": "^1.8.0",
+    "nodemailer": "^6.9.7",
+    "pdf-lib": "^1.17.1",
+    "uuid": "^9.0.1"
+  }
+}
