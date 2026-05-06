@@ -178,6 +178,7 @@ export interface DocumentStatusResponse {
 export interface SigningInfoResponse {
   recipient: Recipient;
   documentTitle: string;
+  documentFilename: string;
   alreadySigned: boolean;
   fields: SignatureField[];
 }

@@ -3,7 +3,7 @@ import { useParams } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { FileSignature, CheckCircle2, AlertCircle, Stamp } from "lucide-react";
+import { FileSignature, CheckCircle2, AlertCircle, Stamp, FileText } from "lucide-react";
 
 import {
   useGetSigningInfo,
@@ -79,8 +79,8 @@ export function SignPage() {
     }
   };
 
-  const hasPdf = data?.recipient && !isLoading;
   const recipientFields = data?.fields ?? [];
+  const isPdf = data?.documentFilename?.toLowerCase().endsWith(".pdf") ?? true;
 
   const renderSigningOverlay = () => (
     <>
@@ -179,23 +179,52 @@ export function SignPage() {
 
       <main className="flex-1 container mx-auto px-4 py-8 max-w-5xl">
         <div className="grid lg:grid-cols-[1fr_380px] gap-8 items-start">
-          {/* Left: PDF Viewer */}
+          {/* Left: Document Viewer */}
           <div className="space-y-3">
             <h2 className="font-semibold text-lg">{data.documentTitle}</h2>
-            {recipientFields.length > 0 && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-sm bg-amber-400/60 border border-amber-500" />
-                Your signature field is highlighted on the document
-              </p>
+            {isPdf ? (
+              <>
+                {recipientFields.length > 0 && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                    <span className="inline-block h-3 w-3 rounded-sm bg-amber-400/60 border border-amber-500" />
+                    Your signature field is highlighted on the document
+                  </p>
+                )}
+                <PdfViewer
+                  fileUrl={`/api/sign/${token}/file`}
+                  currentPage={currentPage}
+                  numPages={numPages}
+                  onLoadSuccess={setNumPages}
+                  onPageChange={setCurrentPage}
+                  renderOverlay={recipientFields.length > 0 ? renderSigningOverlay : undefined}
+                />
+              </>
+            ) : (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center gap-4 py-12 text-center">
+                  <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-semibold text-foreground">{data.documentFilename}</p>
+                    <p className="text-sm text-muted-foreground">
+                      In-browser preview is only available for PDF files.
+                    </p>
+                  </div>
+                  <a
+                    href={`/api/sign/${token}/file`}
+                    download={data.documentFilename}
+                    className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Download to review
+                  </a>
+                  <p className="text-xs text-muted-foreground max-w-xs">
+                    Please download and review the document before submitting your signature below.
+                  </p>
+                </CardContent>
+              </Card>
             )}
-            <PdfViewer
-              fileUrl={`/api/sign/${token}/file`}
-              currentPage={currentPage}
-              numPages={numPages}
-              onLoadSuccess={setNumPages}
-              onPageChange={setCurrentPage}
-              renderOverlay={recipientFields.length > 0 ? renderSigningOverlay : undefined}
-            />
           </div>
 
           {/* Right: Signing Form */}

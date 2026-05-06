@@ -42,6 +42,7 @@ router.get("/sign/:token", async (req: Request, res: Response) => {
     res.json({
       recipient: r,
       documentTitle: doc?.title ?? "Unknown Document",
+      documentFilename: doc?.filename ?? "",
       alreadySigned: r.status === "signed",
       fields,
     });

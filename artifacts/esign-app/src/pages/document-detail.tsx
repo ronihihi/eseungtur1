@@ -411,10 +411,27 @@ export function DocumentDetailPage() {
             </>
           ) : (
             <Card>
-              <CardContent className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
-                <FileText className="h-10 w-10 mb-3" />
-                <p className="font-medium">PDF preview not available for this file type</p>
-                <p className="text-sm mt-1">{doc.filename}</p>
+              <CardContent className="flex flex-col items-center justify-center gap-4 p-12 text-center">
+                <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
+                  <FileText className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div className="space-y-1">
+                  <p className="font-semibold text-foreground">{doc.filename}</p>
+                  <p className="text-sm text-muted-foreground">
+                    In-browser preview is only available for PDF files.
+                  </p>
+                </div>
+                <a
+                  href={`/api/documents/${id}/file`}
+                  download={doc.filename}
+                  className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  <FileText className="h-4 w-4" />
+                  Download to view
+                </a>
+                <p className="text-xs text-muted-foreground max-w-xs">
+                  To use signature field placement, convert your document to PDF before uploading.
+                </p>
               </CardContent>
             </Card>
           )}
