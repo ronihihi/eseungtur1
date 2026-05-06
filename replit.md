@@ -48,6 +48,7 @@ A full-stack DocuSign-style e-signature app where teams upload PDFs, place signa
 - File uploads stored on local disk (`uploads/` folder); filepath stored in DB
 - SMTP email is optional — if not configured, email sends are skipped with a warning log
 - PDF served via authenticated `/api/documents/:id/file` (session cookie) or public `/api/sign/:token/file` (token in URL)
+- Signed PDF download via `/api/documents/:id/download` (auth) or `/api/sign/:token/download` (public) — uses pdf-lib to burn signature images + signer name + date directly into the PDF file at download time; falls back gracefully if no signatures collected yet
 - pdfjs worker copied to `artifacts/esign-app/public/pdf.worker.min.mjs` (cdnjs doesn't carry pdfjs v5); referenced as `/pdf.worker.min.mjs`
 - DOCX/DOC uploads auto-converted to PDF at upload time via LibreOffice (`soffice --headless --convert-to pdf`); original DOCX deleted after conversion; uses per-request temp profile dir to avoid lock conflicts
 - Each recipient is limited to exactly one signature field — placing a new one replaces any previous one for that person
@@ -68,6 +69,7 @@ A full-stack DocuSign-style e-signature app where teams upload PDFs, place signa
 - Real-time signing progress tracked per document
 - Send reminders to pending recipients; copy signing links
 - Full audit trail (signed-at timestamp, signer name, IP address)
+- **Signed PDF download** — Download button on both the document detail page and the signing confirmation page produces a PDF with all collected signatures burned in (signature image + signer name + date embedded via pdf-lib); if a field was placed, the signature overlays the field box; if no field, a signature block is appended at the foot of the last page
 
 ## User preferences
 

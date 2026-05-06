@@ -185,7 +185,7 @@ export function SignPage() {
               <span>WorkflowSign</span>
             </div>
             <a
-              href={`/api/sign/${token}/file`}
+              href={`/api/sign/${token}/download`}
               download={data.documentFilename || "document.pdf"}
             >
               <Button variant="outline" size="sm">
@@ -251,7 +251,7 @@ export function SignPage() {
                   <p className="text-sm text-muted-foreground">Your signature has been recorded.</p>
                 </div>
                 <a
-                  href={`/api/sign/${token}/file`}
+                  href={`/api/sign/${token}/download`}
                   download={data.documentFilename || "document.pdf"}
                   className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                 >
@@ -310,7 +310,7 @@ export function SignPage() {
                     </p>
                   </div>
                   <a
-                    href={`/api/sign/${token}/file`}
+                    href={`/api/sign/${token}/download`}
                     download={data.documentFilename}
                     className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                   >

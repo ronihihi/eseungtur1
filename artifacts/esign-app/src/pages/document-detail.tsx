@@ -329,7 +329,7 @@ export function DocumentDetailPage() {
           <div className="flex items-center gap-3">
             <StatusBadge status={doc.status} />
             {isPdf && (
-              <a href={`/api/documents/${id}/file`} download={doc.filename}>
+              <a href={`/api/documents/${id}/download`} download={doc.filename}>
                 <Button variant="outline" size="sm">
                   <Download className="mr-1.5 h-3.5 w-3.5" />
                   Download
@@ -434,7 +434,7 @@ export function DocumentDetailPage() {
                   </p>
                 </div>
                 <a
-                  href={`/api/documents/${id}/file`}
+                  href={`/api/documents/${id}/download`}
                   download={doc.filename}
                   className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                 >

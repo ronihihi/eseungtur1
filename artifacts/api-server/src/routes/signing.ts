@@ -6,6 +6,7 @@ import path from "path";
 import { SubmitSignatureBody } from "@workspace/api-zod";
 import type { Request, Response } from "express";
 import { sendSigningEmail } from "./emailService.js";
+import { buildSignedPdf } from "./pdfSigner.js";
 
 const router: IRouter = Router();
 
@@ -199,6 +200,62 @@ router.post("/sign/:token", async (req: Request, res: Response) => {
   } catch (err) {
     req.log.error({ err }, "submit signature error");
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/sign/:token/download", async (req: Request, res: Response) => {
+  const token = req.params.token as string;
+  try {
+    const recs = await db.select().from(recipientsTable).where(eq(recipientsTable.token, token)).limit(1);
+    if (recs.length === 0) {
+      res.status(404).json({ error: "Invalid signing link" });
+      return;
+    }
+    const docId = recs[0].documentId;
+    const docs = await db.select().from(documentsTable).where(eq(documentsTable.id, docId)).limit(1);
+    const doc = docs[0];
+    if (!doc || !fs.existsSync(doc.filepath)) {
+      res.status(404).json({ error: "File not found" });
+      return;
+    }
+
+    const ext = path.extname(doc.filepath).toLowerCase();
+    if (ext !== ".pdf") {
+      res.set("Content-Type", "application/octet-stream");
+      res.set("Content-Disposition", `attachment; filename="${doc.filename}"`);
+      res.sendFile(path.resolve(doc.filepath));
+      return;
+    }
+
+    const allRecipients = await db.select().from(recipientsTable).where(eq(recipientsTable.documentId, docId));
+    const signedRecipients = allRecipients.filter((r) => r.status === "signed" && r.signatureData);
+
+    const entries = await Promise.all(
+      signedRecipients.map(async (r) => {
+        const fields = await db
+          .select()
+          .from(signatureFieldsTable)
+          .where(eq(signatureFieldsTable.recipientId, r.id))
+          .limit(1);
+        return {
+          signatureData: r.signatureData!,
+          signerName: r.signerName || r.teamName,
+          signedAt: r.signedAt ? new Date(r.signedAt) : new Date(),
+          field: fields[0]
+            ? { page: fields[0].page, x: fields[0].x, y: fields[0].y, width: fields[0].width, height: fields[0].height }
+            : null,
+        };
+      })
+    );
+
+    const pdfBytes = await buildSignedPdf(doc.filepath, entries);
+    const safeName = doc.filename.replace(/[^a-z0-9.\-_]/gi, "_");
+    res.set("Content-Type", "application/pdf");
+    res.set("Content-Disposition", `attachment; filename="${safeName}"`);
+    res.send(Buffer.from(pdfBytes));
+  } catch (err) {
+    req.log.error({ err }, "download signed pdf error");
+    res.status(500).json({ error: "Failed to generate signed PDF" });
   }
 });
 

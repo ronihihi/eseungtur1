@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 import { eq, and } from "drizzle-orm";
 import { db, documentsTable, recipientsTable, signatureFieldsTable } from "@workspace/db";
 import type { Request, Response } from "express";
+import { buildSignedPdf } from "./pdfSigner.js";
 
 const execFileAsync = promisify(execFile);
 const SOFFICE = "/nix/store/074580fbnhxwxldi7g30hz5ll1h471za-libreoffice-7.6.7.2-wrapped/bin/soffice";
@@ -265,6 +266,56 @@ router.put("/documents/:id/fields", requireAuth, async (req: Request, res: Respo
   } catch (err) {
     req.log.error({ err }, "save fields error");
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/documents/:id/download", requireAuth, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  try {
+    const docs = await db.select().from(documentsTable).where(eq(documentsTable.id, id)).limit(1);
+    const doc = docs[0];
+    if (!doc || !fs.existsSync(doc.filepath)) {
+      res.status(404).json({ error: "Document not found" });
+      return;
+    }
+
+    const ext = path.extname(doc.filepath).toLowerCase();
+    if (ext !== ".pdf") {
+      res.set("Content-Type", "application/octet-stream");
+      res.set("Content-Disposition", `attachment; filename="${doc.filename}"`);
+      res.sendFile(path.resolve(doc.filepath));
+      return;
+    }
+
+    const recipients = await db.select().from(recipientsTable).where(eq(recipientsTable.documentId, id));
+    const signedRecipients = recipients.filter((r) => r.status === "signed" && r.signatureData);
+
+    const entries = await Promise.all(
+      signedRecipients.map(async (r) => {
+        const fields = await db
+          .select()
+          .from(signatureFieldsTable)
+          .where(eq(signatureFieldsTable.recipientId, r.id))
+          .limit(1);
+        return {
+          signatureData: r.signatureData!,
+          signerName: r.signerName || r.teamName,
+          signedAt: r.signedAt ? new Date(r.signedAt) : new Date(),
+          field: fields[0]
+            ? { page: fields[0].page, x: fields[0].x, y: fields[0].y, width: fields[0].width, height: fields[0].height }
+            : null,
+        };
+      })
+    );
+
+    const pdfBytes = await buildSignedPdf(doc.filepath, entries);
+    const safeName = doc.filename.replace(/[^a-z0-9.\-_]/gi, "_");
+    res.set("Content-Type", "application/pdf");
+    res.set("Content-Disposition", `attachment; filename="${safeName}"`);
+    res.send(Buffer.from(pdfBytes));
+  } catch (err) {
+    req.log.error({ err }, "download signed pdf error");
+    res.status(500).json({ error: "Failed to generate signed PDF" });
   }
 });
 
