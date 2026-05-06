@@ -684,10 +684,10 @@ export function DocumentDetailPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => append({ teamName: "", email: "" })}
-                          disabled={formFields.length >= 7}
+                          disabled={formFields.length >= 20}
                         >
                           <Plus className="mr-1 h-3.5 w-3.5" />
-                          Add ({formFields.length}/7)
+                          Add ({formFields.length}/20)
                         </Button>
                         <Button type="submit" size="sm" disabled={setRecipientsMutation.isPending}>
                           {setRecipientsMutation.isPending ? "Saving…" : "Save Recipients"}
