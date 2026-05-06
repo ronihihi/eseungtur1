@@ -248,14 +248,33 @@ export function SignPage() {
     </>
   );
 
+  // When completed, show all signers' fields; otherwise just this recipient's fields
+  const allSignedFields = (data as { allSignedFields?: typeof recipientFields })?.allSignedFields ?? [];
+  const completedOverlayFields =
+    data?.documentStatus === "completed" && allSignedFields.length > 0
+      ? allSignedFields
+      : recipientFields;
+
   const renderCompletedOverlay = () => (
     <>
-      {recipientFields
+      {completedOverlayFields
         .filter((f) => f.page === currentPage)
         .map((f, idx) => {
           const ft = ((f as { fieldType?: string }).fieldType || "signature") as FieldType;
           const fieldId = (f as { id?: string }).id;
           const storedVal = fieldId ? fieldValues[fieldId] : undefined;
+          // fieldValue from server (for other recipients' fields)
+          const serverVal = (f as { fieldValue?: string | null }).fieldValue ?? undefined;
+          const isOwnField = recipientFields.some((rf) => (rf as { id?: string }).id === fieldId);
+          const isSignField = ft === "signature" || ft === "initials";
+          // Own signature: use form's completedSig; other recipients: use stored fieldValue from server
+          const sigSrc = isSignField
+            ? isOwnField
+              ? completedSig || serverVal
+              : serverVal
+            : undefined;
+          const textVal = !isSignField ? (isOwnField ? storedVal || serverVal : serverVal) : undefined;
+
           return (
             <div
               key={idx}
@@ -269,10 +288,10 @@ export function SignPage() {
                 border: "2px solid #22c55e",
               }}
             >
-              {(ft === "signature" || ft === "initials") && completedSig ? (
-                <img src={completedSig} alt="Signature" className="max-h-full max-w-full object-contain p-1" />
-              ) : storedVal ? (
-                <span className="text-[10px] font-semibold truncate px-1 select-none text-green-800">{storedVal}</span>
+              {isSignField && sigSrc ? (
+                <img src={sigSrc} alt="Signature" className="max-h-full max-w-full object-contain p-1" />
+              ) : textVal ? (
+                <span className="text-[10px] font-semibold truncate px-1 select-none text-green-800">{textVal}</span>
               ) : (
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
               )}

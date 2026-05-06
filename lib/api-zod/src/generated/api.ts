@@ -374,6 +374,22 @@ export const GetSigningInfoResponse = zod.object({
       fieldValue: zod.string().nullish(),
     }),
   ),
+  allSignedFields: zod
+    .array(
+      zod.object({
+        id: zod.string(),
+        documentId: zod.string(),
+        recipientId: zod.string(),
+        page: zod.number(),
+        x: zod.number(),
+        y: zod.number(),
+        width: zod.number(),
+        height: zod.number(),
+        fieldType: zod.enum(["signature", "initials", "date", "text"]),
+        fieldValue: zod.string().nullish(),
+      }),
+    )
+    .optional(),
 });
 
 /**

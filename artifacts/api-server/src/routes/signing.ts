@@ -109,6 +109,15 @@ router.get("/sign/:token", async (req: Request, res: Response) => {
       .from(signatureFieldsTable)
       .where(eq(signatureFieldsTable.recipientId, r.id));
 
+    // When fully completed, return all signed fields so every recipient can see everyone's signatures
+    let allSignedFields: typeof fields = [];
+    if (doc?.status === "completed") {
+      allSignedFields = await db
+        .select()
+        .from(signatureFieldsTable)
+        .where(eq(signatureFieldsTable.documentId, r.documentId));
+    }
+
     res.json({
       recipient: r,
       documentTitle: doc?.title ?? "Unknown Document",
@@ -116,6 +125,7 @@ router.get("/sign/:token", async (req: Request, res: Response) => {
       alreadySigned: r.status === "signed",
       documentStatus: doc?.status ?? "sent",
       fields,
+      allSignedFields,
     });
   } catch (err) {
     req.log.error({ err }, "get signing info error");

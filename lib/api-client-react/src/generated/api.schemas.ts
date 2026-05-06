@@ -215,6 +215,7 @@ export interface SigningInfoResponse {
   alreadySigned: boolean;
   documentStatus: string;
   fields: SignatureField[];
+  allSignedFields?: SignatureField[];
 }
 
 /**

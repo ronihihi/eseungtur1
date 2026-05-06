@@ -991,6 +991,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SignatureField"
+        allSignedFields:
+          type: array
+          items:
+            $ref: "#/components/schemas/SignatureField"
       required:
         - recipient
         - documentTitle
