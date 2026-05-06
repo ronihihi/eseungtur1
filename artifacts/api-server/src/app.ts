@@ -34,8 +34,8 @@ app.use(
   }),
 );
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "70mb" }));
+app.use(express.urlencoded({ extended: true, limit: "70mb" }));
 
 if (!process.env.SESSION_SECRET) {
   logger.warn("SESSION_SECRET not set — using insecure default");

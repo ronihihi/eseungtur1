@@ -1,5 +1,4 @@
 import { Router, type IRouter } from "express";
-import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -41,23 +40,6 @@ const router: IRouter = Router();
 const uploadsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "../uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname)),
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = [".pdf", ".docx", ".doc"];
-    if (allowed.includes(path.extname(file.originalname).toLowerCase())) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only PDF and Word documents are allowed"));
-    }
-  },
-});
 
 function requireAuth(req: Request, res: Response, next: () => void) {
   if (!req.session.userId) {
@@ -94,25 +76,47 @@ router.get("/documents", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.post("/documents", requireAuth, upload.single("document"), async (req: Request, res: Response) => {
+router.post("/documents", requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!req.file) {
+    const { fileData, fileName, title, signing_order } = req.body as {
+      fileData?: string;
+      fileName?: string;
+      title?: string;
+      signing_order?: string;
+    };
+
+    if (!fileData || !fileName) {
       res.status(400).json({ error: "No file uploaded" });
       return;
     }
-    const { title, signing_order } = req.body as { title?: string; signing_order?: string };
 
-    let finalFilePath = req.file.path;
-    let finalFilename = req.file.originalname;
+    const allowed = [".pdf", ".docx", ".doc"];
+    const ext = path.extname(fileName).toLowerCase();
+    if (!allowed.includes(ext)) {
+      res.status(400).json({ error: "Only PDF and Word documents are allowed" });
+      return;
+    }
 
-    const ext = path.extname(req.file.originalname).toLowerCase();
+    const buffer = Buffer.from(fileData, "base64");
+    if (buffer.length > 50 * 1024 * 1024) {
+      res.status(413).json({ error: "File exceeds the 50 MB limit" });
+      return;
+    }
+
+    const savedName = uuidv4() + ext;
+    const savedPath = path.join(uploadsDir, savedName);
+    fs.writeFileSync(savedPath, buffer);
+
+    let finalFilePath = savedPath;
+    let finalFilename = fileName;
+
     if (ext === ".docx" || ext === ".doc") {
       try {
-        const pdfPath = await convertDocxToPdf(req.file.path, uploadsDir);
-        fs.unlinkSync(req.file.path);
+        const pdfPath = await convertDocxToPdf(savedPath, uploadsDir);
+        fs.unlinkSync(savedPath);
         finalFilePath = pdfPath;
-        finalFilename = path.basename(req.file.originalname, ext) + ".pdf";
-        req.log.info({ originalName: req.file.originalname, pdfPath }, "converted DOCX to PDF");
+        finalFilename = path.basename(fileName, ext) + ".pdf";
+        req.log.info({ originalName: fileName, pdfPath }, "converted DOCX to PDF");
       } catch (convErr) {
         req.log.error({ convErr }, "DOCX to PDF conversion failed — keeping original");
       }
@@ -121,7 +125,7 @@ router.post("/documents", requireAuth, upload.single("document"), async (req: Re
     const newId = uuidv4();
     await db.insert(documentsTable).values({
       id: newId,
-      title: title || req.file.originalname,
+      title: title || fileName,
       filename: finalFilename,
       filepath: finalFilePath,
       uploadedBy: req.session.userId!,
