@@ -11,13 +11,36 @@ import type { Request, Response } from "express";
 import { buildSignedPdf } from "./pdfSigner.js";
 
 const execFileAsync = promisify(execFile);
-const SOFFICE = "/nix/store/074580fbnhxwxldi7g30hz5ll1h471za-libreoffice-7.6.7.2-wrapped/bin/soffice";
+
+const SOFFICE_CANDIDATES = [
+  "soffice",
+  "/usr/bin/soffice",
+  "/usr/lib/libreoffice/program/soffice",
+  "/nix/store/074580fbnhxwxldi7g30hz5ll1h471za-libreoffice-7.6.7.2-wrapped/bin/soffice",
+];
+
+let _sofficeCache: string | null = null;
+
+async function findSoffice(): Promise<string> {
+  if (_sofficeCache) return _sofficeCache;
+  for (const candidate of SOFFICE_CANDIDATES) {
+    try {
+      await execFileAsync(candidate, ["--version"], { timeout: 5_000 });
+      _sofficeCache = candidate;
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("LibreOffice is not available in this environment. Please upload a PDF file instead.");
+}
 
 async function convertDocxToPdf(inputPath: string, outputDir: string): Promise<string> {
+  const soffice = await findSoffice();
   const tmpProfile = `/tmp/lo-profile-${uuidv4()}`;
   try {
     await execFileAsync(
-      SOFFICE,
+      soffice,
       [
         "--headless",
         "--norestore",
@@ -118,7 +141,11 @@ router.post("/documents", requireAuth, async (req: Request, res: Response) => {
         finalFilename = path.basename(fileName, ext) + ".pdf";
         req.log.info({ originalName: fileName, pdfPath }, "converted DOCX to PDF");
       } catch (convErr) {
-        req.log.error({ convErr }, "DOCX to PDF conversion failed — keeping original");
+        fs.unlinkSync(savedPath);
+        req.log.error({ convErr }, "DOCX to PDF conversion failed");
+        const msg = convErr instanceof Error ? convErr.message : "Could not convert Word document to PDF.";
+        res.status(500).json({ error: msg });
+        return;
       }
     }
 
