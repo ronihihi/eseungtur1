@@ -6,6 +6,7 @@ import path from "path";
 import { SubmitSignatureBody } from "@workspace/api-zod";
 import type { Request, Response } from "express";
 import { sendSigningEmail } from "./emailService.js";
+import { getAppBaseUrl } from "../lib/appUrl.js";
 import { buildSignedPdf } from "./pdfSigner.js";
 import { downloadFromGcs, streamFromGcs, isGcsPath } from "../lib/gcsStorage.js";
 
@@ -221,9 +222,7 @@ router.post("/sign/:token", async (req: Request, res: Response) => {
       const next = allRecipients.find((x) => x.signOrder === r.signOrder + 1 && x.status === "pending");
 
       if (next) {
-        const host = req.get("host") || "localhost";
-        const protocol = req.protocol || "https";
-        const baseUrl = process.env.APP_URL || `${protocol}://${host}`;
+        const baseUrl = getAppBaseUrl(req);
         await sendSigningEmail(next, doc, `${baseUrl}/sign/${next.token}`, null, null, "E-Sign Workflow");
       }
     }

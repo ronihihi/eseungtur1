@@ -7,6 +7,9 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Trust Replit's reverse proxy so req.protocol / req.secure / req.ip are correct
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
@@ -47,7 +50,8 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false,
+      // In production (REPLIT_DOMAINS is set) use secure cookies over HTTPS
+      secure: !!process.env.REPLIT_DOMAINS,
       maxAge: 24 * 60 * 60 * 1000,
       sameSite: "lax",
     },

@@ -5,6 +5,7 @@ import { db, documentsTable, recipientsTable, signatureFieldsTable } from "@work
 import { SetRecipientsBody } from "@workspace/api-zod";
 import type { Request, Response } from "express";
 import { sendSigningEmail } from "./emailService.js";
+import { getAppBaseUrl } from "../lib/appUrl.js";
 
 const router: IRouter = Router();
 
@@ -106,9 +107,7 @@ router.post("/documents/:id/send", requireAuth, async (req: Request, res: Respon
       return;
     }
 
-    const host = req.get("host") || "localhost";
-    const protocol = req.protocol || "https";
-    const baseUrl = process.env.APP_URL || `${protocol}://${host}`;
+    const baseUrl = getAppBaseUrl(req);
 
     const toSend = doc.signingOrder === "sequential" ? [recipients[0]] : recipients;
 
@@ -156,9 +155,7 @@ router.post("/recipients/:recipientId/remind", requireAuth, async (req: Request,
     }
     const doc = docs[0];
 
-    const host = req.get("host") || "localhost";
-    const protocol = req.protocol || "https";
-    const baseUrl = process.env.APP_URL || `${protocol}://${host}`;
+    const baseUrl = getAppBaseUrl(req);
 
     await sendSigningEmail(
       r,

@@ -1,9 +1,9 @@
-import { Storage } from "@google-cloud/storage";
+import { Storage as GcsStorage } from "@google-cloud/storage";
 import type { Response } from "express";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 
-const gcsClient = new Storage({
+const gcsClient = new GcsStorage({
   credentials: {
     audience: "replit",
     subject_token_type: "access_token",
@@ -17,7 +17,8 @@ const gcsClient = new Storage({
       },
     },
     universe_domain: "googleapis.com",
-  } as Parameters<typeof Storage>[0]["credentials"],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any,
   projectId: "",
 });
 
