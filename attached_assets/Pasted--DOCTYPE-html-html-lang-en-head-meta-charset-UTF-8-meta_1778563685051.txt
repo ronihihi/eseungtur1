@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOS Children's Villages – Web Developer Brand Reference</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap');
+
+  :root {
+    --blue: #00abec;
+    --blue-20: #cde8f8;
+    --blue-10: #e4f3fb;
+    --red: #de5a6c;
+    --red-20: #f1c9c6;
+    --red-10: #f9e5e4;
+    --dark-blue: #1c325d;
+    --dark-blue-2: #78849e;
+    --dark-blue-3: #b3c3cf;
+    --white: #ffffff;
+    --orange: #e47f3a;
+    --green: #81bc70;
+    --text: #1c325d;
+    --bg: #f7fbfe;
+    --card: #fff;
+    --border: #e0eefc;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Roboto', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--dark-blue);
+    color: white;
+    padding: 36px 48px 28px;
+    display: flex;
+    align-items: flex-start;
+    gap: 28px;
+    border-bottom: 4px solid var(--blue);
+  }
+  .header-badge {
+    background: var(--blue);
+    color: white;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 1px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    display: inline-block;
+    margin-bottom: 10px;
+  }
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  header p {
+    opacity: 0.75;
+    font-size: 14px;
+    margin-top: 6px;
+  }
+  .org-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 10px 18px;
+  }
+  .emblem {
+    width: 44px; height: 44px;
+    background: var(--blue);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .org-name { font-weight: 700; font-size: 13px; line-height: 1.3; color: white; }
+
+  /* LAYOUT */
+  main { max-width: 1100px; margin: 0 auto; padding: 40px 24px 60px; }
+  .section { margin-bottom: 48px; }
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--blue);
+    border-bottom: 2px solid var(--blue-20);
+    padding-bottom: 8px;
+    margin-bottom: 22px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title .icon { font-size: 16px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .card h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--dark-blue);
+  }
+
+  /* COLORS */
+  .color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+  }
+  .color-card {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+  .color-swatch {
+    height: 70px;
+    position: relative;
+  }
+  .color-swatch .badge {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: rgba(0,0,0,0.18);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 8px;
+    letter-spacing: 0.5px;
+  }
+  .color-info {
+    padding: 12px;
+  }
+  .color-name {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--dark-blue);
+    margin-bottom: 6px;
+  }
+  .color-code {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+    font-size: 12px;
+    font-family: monospace;
+    color: #555;
+  }
+  .color-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .usage-tag {
+    display: inline-block;
+    background: var(--blue-10);
+    color: var(--dark-blue);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-top: 6px;
+  }
+  .usage-tag.red { background: var(--red-10); }
+  .usage-tag.dark { background: #e6eaf1; }
+
+  /* CSS SNIPPET */
+  .code-block {
+    background: #0f1c34;
+    color: #a8d8f0;
+    border-radius: 10px;
+    padding: 20px 24px;
+    font-family: 'Courier New', monospace;
+    font-size: 12.5px;
+    line-height: 1.9;
+    overflow-x: auto;
+    position: relative;
+  }
+  .code-label {
+    position: absolute;
+    top: 10px; right: 14px;
+    background: var(--blue);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-family: 'Roboto', sans-serif;
+  }
+  .token-var { color: #79dcf0; }
+  .token-val { color: #a8f0c0; }
+  .token-comment { color: #5a7a9a; font-style: italic; }
+
+  /* TYPOGRAPHY */
+  .font-demo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 700px) { .font-demo { grid-template-columns: 1fr; } }
+  .font-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    background: var(--card);
+  }
+  .font-label { font-size: 11px; font-weight: 700; color: var(--blue); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  .font-family-name { font-size: 13px; font-weight: 700; color: var(--dark-blue); margin-bottom: 12px; }
+  .font-weights { display: flex; flex-wrap: wrap; gap: 8px; }
+  .weight-pill {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .font-rules { margin-top: 14px; }
+  .font-rule {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    margin-bottom: 7px;
+    color: var(--dark-blue);
+  }
+  .check { color: #00abec; font-size: 14px; flex-shrink: 0; }
+  .cross { color: var(--red); font-size: 14px; flex-shrink: 0; }
+
+  /* DO/DON'T */
+  .dos-donts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 600px) { .dos-donts { grid-template-columns: 1fr; } }
+  .do-card, .dont-card {
+    border-radius: 10px;
+    padding: 18px;
+    font-size: 13px;
+  }
+  .do-card { background: #eafaf1; border: 1px solid #a3e6c0; }
+  .dont-card { background: #fdf2f3; border: 1px solid #f1bcc3; }
+  .do-card h4 { color: #1a7a42; margin-bottom: 10px; font-size: 13px; }
+  .dont-card h4 { color: #c0253a; margin-bottom: 10px; font-size: 13px; }
+  .do-card li, .dont-card li { margin-left: 16px; margin-bottom: 5px; }
+
+  /* DESIGN PRINCIPLES */
+  .principles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+  }
+  .principle-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    border-top: 3px solid var(--blue);
+  }
+  .principle-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--dark-blue); }
+  .principle-card p { font-size: 12.5px; color: #444; line-height: 1.55; }
+
+  /* QUICK REF TABLE */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--dark-blue); color: white; padding: 10px 14px; text-align: left; font-size: 12px; letter-spacing: 0.5px; }
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child { border-radius: 0 8px 0 0; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: #f5fafd; }
+  code { font-family: monospace; background: #e8f3fb; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: var(--dark-blue); }
+
+  /* CONTACT */
+  .contact-bar {
+    background: var(--dark-blue);
+    color: white;
+    border-radius: 12px;
+    padding: 22px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 14px;
+  }
+  .contact-bar a { color: var(--blue); font-weight: 700; }
+  .contact-icon { font-size: 28px; }
+
+  .tints-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .tint-swatch {
+    flex: 1 1 80px;
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+    font-size: 11px;
+    font-family: monospace;
+    font-weight: 700;
+    border: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="header-badge">BRAND REFERENCE</span>
+    <h1>SOS Children's Villages<br>Web Developer Guide</h1>
+    <p>Everything you need to implement the brand correctly on the website · v2022</p>
+  </div>
+  <div class="org-logo">
+    <div class="emblem">🏘️</div>
+    <div class="org-name">SOS Children's<br>Villages</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- BRAND ESSENCE -->
+  <div class="section">
+    <div class="section-title"><span class="icon">💡</span> Brand Essence (Know Before You Build)</div>
+    <div class="card">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Belief</div>
+          <div style="font-size:13px;color:var(--dark-blue);">Truly bonding with a child has the power to change the world.</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Purpose</div>
+          <div style="font-size:13px;color:var(--dark-blue);">Ensure each child grows up with the bonds they need to become their strongest selves.</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Visual Character</div>
+          <div style="font-size:13px;color:var(--dark-blue);">Bold + soft. Depth through layers. Rounded shapes balanced with sharp edges. Asymmetric, grounded layouts.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COLORS -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🎨</span> Colour Palette</div>
+
+    <div class="color-grid">
+      <div class="color-card">
+        <div class="color-swatch" style="background:#00abec;"><span class="badge">PRIMARY</span></div>
+        <div class="color-info">
+          <div class="color-name">Brand Blue</div>
+          <div class="color-code"><span class="color-dot" style="background:#00abec;"></span>HEX: #00abec</div>
+          <div class="color-code"><span class="color-dot" style="background:#00abec;"></span>RGB: 0, 171, 236</div>
+          <div class="color-code"><span class="color-dot" style="background:#00abec;"></span>CMYK: 100-0-0-0</div>
+          <span class="usage-tag">Buttons, links, highlights, icons</span>
+        </div>
+      </div>
+
+      <div class="color-card">
+        <div class="color-swatch" style="background:#de5a6c;"><span class="badge">ACCENT</span></div>
+        <div class="color-info">
+          <div class="color-name">Brand Red</div>
+          <div class="color-code"><span class="color-dot" style="background:#de5a6c;"></span>HEX: #de5a6c</div>
+          <div class="color-code"><span class="color-dot" style="background:#de5a6c;"></span>RGB: 222, 90, 108</div>
+          <div class="color-code"><span class="color-dot" style="background:#de5a6c;"></span>CMYK: 0-85-45-0</div>
+          <span class="usage-tag red">Small accents only — do NOT overuse</span>
+        </div>
+      </div>
+
+      <div class="color-card">
+        <div class="color-swatch" style="background:#1c325d;"><span class="badge">TEXT</span></div>
+        <div class="color-info">
+          <div class="color-name">Dark Blue</div>
+          <div class="color-code"><span class="color-dot" style="background:#1c325d;"></span>HEX: #1c325d</div>
+          <div class="color-code"><span class="color-dot" style="background:#1c325d;"></span>RGB: 28, 50, 93</div>
+          <div class="color-code"><span class="color-dot" style="background:#1c325d;"></span>CMYK: 100-85-30-30</div>
+          <span class="usage-tag dark">Use instead of black for ALL text</span>
+        </div>
+      </div>
+
+      <div class="color-card">
+        <div class="color-swatch" style="background:#ffffff;border-bottom:1px solid #e0eefc;"><span class="badge" style="color:#1c325d;background:rgba(0,0,0,0.06);">BACKGROUND</span></div>
+        <div class="color-info">
+          <div class="color-name">White</div>
+          <div class="color-code"><span class="color-dot" style="background:#fff;border:1px solid #ddd;"></span>HEX: #ffffff</div>
+          <span class="usage-tag">Primary background — most used</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tints -->
+    <div class="card" style="margin-top:16px;">
+      <h3>Blue Tints (Backgrounds & Fills)</h3>
+      <p style="font-size:12px;color:#666;margin-bottom:14px;">Only white and the 20% blue tint should be used as page backgrounds. Never use full Brand Blue as a background.</p>
+      <div class="tints-row">
+        <div class="tint-swatch" style="background:#cde8f8;color:#1c325d;">Blue 20%<br>#cde8f8</div>
+        <div class="tint-swatch" style="background:#e4f3fb;color:#1c325d;">Blue 10%<br>#e4f3fb</div>
+        <div class="tint-swatch" style="background:#f1c9c6;color:#1c325d;">Red 20%<br>#f1c9c6</div>
+        <div class="tint-swatch" style="background:#f9e5e4;color:#1c325d;">Red 10%<br>#f9e5e4</div>
+      </div>
+      <h3 style="margin-top:18px;">Supporting / Data Colours</h3>
+      <div class="tints-row" style="margin-top:10px;">
+        <div class="tint-swatch" style="background:#78849e;color:white;">Mid Blue<br>#78849e</div>
+        <div class="tint-swatch" style="background:#b3c3cf;color:#1c325d;">Light Blue<br>#b3c3cf</div>
+        <div class="tint-swatch" style="background:#e47f3a;color:white;">Orange<br>#e47f3a</div>
+        <div class="tint-swatch" style="background:#81bc70;color:white;">Green<br>#81bc70</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CSS VARIABLES -->
+  <div class="section">
+    <div class="section-title"><span class="icon">💻</span> CSS Variables (Copy-Paste Ready)</div>
+    <div class="code-block">
+      <span class="code-label">CSS</span>
+<span class="token-comment">/* SOS Children's Villages – Brand Tokens */</span>
+<span class="token-var">:root</span> {
+  <span class="token-comment">/* Core Colours */</span>
+  <span class="token-var">--sos-blue</span>:         <span class="token-val">#00abec</span>;   <span class="token-comment">/* Primary – buttons, links, key elements */</span>
+  <span class="token-var">--sos-red</span>:          <span class="token-val">#de5a6c</span>;   <span class="token-comment">/* Accent – use sparingly */</span>
+  <span class="token-var">--sos-dark-blue</span>:    <span class="token-val">#1c325d</span>;   <span class="token-comment">/* Text – replaces black */</span>
+  <span class="token-var">--sos-white</span>:        <span class="token-val">#ffffff</span>;
+
+  <span class="token-comment">/* Tints */</span>
+  <span class="token-var">--sos-blue-20</span>:      <span class="token-val">#cde8f8</span>;   <span class="token-comment">/* Preferred background tint */</span>
+  <span class="token-var">--sos-blue-10</span>:      <span class="token-val">#e4f3fb</span>;
+  <span class="token-var">--sos-red-20</span>:       <span class="token-val">#f1c9c6</span>;
+  <span class="token-var">--sos-red-10</span>:       <span class="token-val">#f9e5e4</span>;
+
+  <span class="token-comment">/* Supporting */</span>
+  <span class="token-var">--sos-mid-blue</span>:     <span class="token-val">#78849e</span>;
+  <span class="token-var">--sos-light-blue</span>:   <span class="token-val">#b3c3cf</span>;
+  <span class="token-var">--sos-orange</span>:       <span class="token-val">#e47f3a</span>;
+  <span class="token-var">--sos-green</span>:        <span class="token-val">#81bc70</span>;
+
+  <span class="token-comment">/* Typography */</span>
+  <span class="token-var">--font-primary</span>:     <span class="token-val">'Aktiv Grotesk', 'Roboto', Arial, sans-serif</span>;
+  <span class="token-var">--font-quote</span>:       <span class="token-val">'Times New Roman', serif</span>;   <span class="token-comment">/* Quotes only */</span>
+  <span class="token-var">--min-font-size</span>:    <span class="token-val">9pt</span>;                        <span class="token-comment">/* Never go below this */</span>
+
+  <span class="token-comment">/* Drop shadow (bubble/emblem elements) */</span>
+  <span class="token-var">--sos-shadow</span>:       <span class="token-val">drop-shadow(0 0 30px rgba(0,0,0,0.10))</span>;
+}</div>
+  </div>
+
+  <!-- TYPOGRAPHY -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🔤</span> Typography</div>
+    <div class="font-demo">
+      <div class="font-card">
+        <div class="font-label">Official Brand Font</div>
+        <div class="font-family-name">Aktiv Grotesk</div>
+        <div class="font-weights">
+          <span class="weight-pill" style="font-weight:400;">Regular</span>
+          <span class="weight-pill" style="font-weight:400;font-style:italic;">Italic</span>
+          <span class="weight-pill" style="font-weight:500;">Medium</span>
+          <span class="weight-pill" style="font-weight:700;">Bold</span>
+          <span class="weight-pill" style="font-weight:800;">XBold</span>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:#666;">Licensed font — must be purchased. Supports 130+ languages.</div>
+      </div>
+      <div class="font-card">
+        <div class="font-label">Digital Fallback Stack</div>
+        <div class="font-family-name">Roboto → Arial</div>
+        <div style="font-size:12.5px;color:#555;margin-top:6px;">Use when Aktiv Grotesk is not available in web contexts. Always define the full stack:</div>
+        <code style="display:block;margin-top:10px;background:#f0f6fb;padding:8px;border-radius:6px;font-size:12px;">'Aktiv Grotesk', 'Roboto', Arial, sans-serif</code>
+        <div style="margin-top:10px;font-size:12px;color:#666;">Import Roboto from Google Fonts as your free web fallback.</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3>Font Usage Rules by Element</h3>
+      <table>
+        <tr>
+          <th>Element</th>
+          <th>Weight</th>
+          <th>Notes</th>
+        </tr>
+        <tr>
+          <td><strong>H1 / Page Title</strong></td>
+          <td>Medium (default) or Regular + Bold combo</td>
+          <td>Line height = font size × 1.15 · Letter spacing: 10 · Kerning: Optical · Use a title line (red or blue bar)</td>
+        </tr>
+        <tr>
+          <td><strong>H2 / Sub-title</strong></td>
+          <td>Medium or Bold (uniform)</td>
+          <td>Consistent weight across all sub-titles</td>
+        </tr>
+        <tr>
+          <td><strong>Body text</strong></td>
+          <td>Regular (default) · Medium or Bold for emphasis</td>
+          <td>Never use XBold in body · Italics ok for emphasis</td>
+        </tr>
+        <tr>
+          <td><strong>Call-out numbers / Stats</strong></td>
+          <td>XBold</td>
+          <td>Reserved exclusively for infographic numbers/data</td>
+        </tr>
+        <tr>
+          <td><strong>Blockquotes</strong></td>
+          <td>Aktiv Grotesk Italic (or Times New Roman Italic)</td>
+          <td>Always paired with oversized Times New Roman Bold quotation mark</td>
+        </tr>
+        <tr>
+          <td><strong>Minimum size</strong></td>
+          <td colspan="2">Never use font sizes smaller than <strong>9pt</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Case</strong></td>
+          <td colspan="2">Always use <strong>sentence case</strong> — even in titles. Never all-caps for headings.</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- DESIGN PRINCIPLES -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📐</span> Design Principles for Web</div>
+    <div class="principles">
+      <div class="principle-card">
+        <h4>Flexibility</h4>
+        <p>No single "right way" to combine elements. Experiment, innovate — just keep each element recognizable.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Anchoring</h4>
+        <p>Anchor design elements and images to the edge of sections or where background color blocks meet. Creates stability.</p>
+      </div>
+      <div class="principle-card" style="border-top-color:var(--red);">
+        <h4>Depth</h4>
+        <p>Layer elements: white background → photo → speech bubble → line → color block → logo. Use soft outer glow (box-shadow) on bordered shapes.</p>
+      </div>
+      <div class="principle-card">
+        <h4>Curvature</h4>
+        <p>Use rounded corners (border-radius) to balance sharp edges. The brand mixes bold rectangles with rounded cards and the iconic bubble shape.</p>
+      </div>
+      <div class="principle-card" style="border-top-color:var(--red);">
+        <h4>Asymmetry</h4>
+        <p>Use asymmetric margins. Elements like the title line, logo, or bubble can intentionally cross into the margin — this is a brand feature, not a bug.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- DO / DON'T -->
+  <div class="section">
+    <div class="section-title"><span class="icon">✅</span> Do's and Don'ts</div>
+    <div class="dos-donts">
+      <div class="do-card">
+        <h4>✅ Do</h4>
+        <ul>
+          <li>Use <strong>#1c325d (Dark Blue)</strong> for all body text instead of black</li>
+          <li>Use white and the 20% blue tint (<code>#cde8f8</code>) as page backgrounds</li>
+          <li>Apply sentence case to all headings and titles</li>
+          <li>Use rounded corners and subtle drop shadows on cards/bubbles</li>
+          <li>Use Brand Blue sparingly for key CTAs and important details</li>
+          <li>Anchor section images and blocks to the layout edges</li>
+          <li>Use Aktiv Grotesk Medium as the default heading weight</li>
+          <li>Use red only for small accents (e.g., title underline, a dot, small icon)</li>
+          <li>Keep minimum font size at 9pt / 12px</li>
+          <li>Use XBold weight only for large data/stat numbers</li>
+        </ul>
+      </div>
+      <div class="dont-card">
+        <h4>❌ Don't</h4>
+        <ul>
+          <li>Don't use pure <code>#000000</code> black for text — use Dark Blue</li>
+          <li>Don't use Brand Blue or Red as full-page background colors</li>
+          <li>Don't use ALL CAPS for headings or titles</li>
+          <li>Don't overuse red — it's for small accent moments only</li>
+          <li>Don't go below 9pt / ~12px font size</li>
+          <li>Don't use XBold in body copy or sub-headings</li>
+          <li>Don't use thin/light font weights for call-out numbers</li>
+          <li>Don't use more than 2 brand colors together per composition</li>
+          <li>Don't place the logo on colored backgrounds without approved contrast rules</li>
+          <li>Don't rotate or alter the logo</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUICK REFERENCE -->
+  <div class="section">
+    <div class="section-title"><span class="icon">⚡</span> Quick Reference Table</div>
+    <table>
+      <tr>
+        <th>Element</th>
+        <th>Value / Token</th>
+        <th>Notes</th>
+      </tr>
+      <tr><td>Primary color</td><td><code>#00abec</code></td><td>Buttons, links, active states, icons</td></tr>
+      <tr><td>Accent color</td><td><code>#de5a6c</code></td><td>Small details only — separator lines, dots</td></tr>
+      <tr><td>Text color</td><td><code>#1c325d</code></td><td>All body text, headings, labels — replaces black</td></tr>
+      <tr><td>Background (main)</td><td><code>#ffffff</code></td><td>Primary page background</td></tr>
+      <tr><td>Background (section)</td><td><code>#cde8f8</code></td><td>20% Blue tint — alternating sections</td></tr>
+      <tr><td>Font stack</td><td><code>'Aktiv Grotesk', 'Roboto', Arial, sans-serif</code></td><td>Aktiv Grotesk is licensed; use Roboto as free web fallback</td></tr>
+      <tr><td>Quote font</td><td><code>'Times New Roman', serif</code></td><td>Italic, paired with large quotation mark</td></tr>
+      <tr><td>Heading weight</td><td>Medium (500)</td><td>Default; can combine Regular + Bold creatively</td></tr>
+      <tr><td>Body weight</td><td>Regular (400)</td><td>Medium/Bold for emphasis; never XBold</td></tr>
+      <tr><td>Min font size</td><td>9pt / ~12px</td><td>Hard minimum</td></tr>
+      <tr><td>Title line height</td><td>font-size × 1.15</td><td>e.g. 38pt → 44pt line height</td></tr>
+      <tr><td>Letter spacing (titles)</td><td>0.02em (≈10 tracking)</td><td>Optical kerning</td></tr>
+      <tr><td>Drop shadow</td><td><code>0 0 30px rgba(0,0,0,0.10)</code></td><td>For bubble/emblem elements</td></tr>
+      <tr><td>Border radius (cards)</td><td>Rounded — experiment freely</td><td>Curvature is a brand feature</td></tr>
+      <tr><td>Color combos max</td><td>2 brand colors per composition</td><td>Primary + 1 accent only</td></tr>
+    </table>
+  </div>
+
+  <!-- CONTACT -->
+  <div class="section">
+    <div class="contact-bar">
+      <span class="contact-icon">📧</span>
+      <div>
+        <strong>Questions about the brand?</strong> Contact the SOS Global Branding Team:<br>
+        <a href="mailto:brand@sos-kd.org">brand@sos-kd.org</a> · Brand assets on SharePoint: <a href="https://soscv.sharepoint.com/sites/WS_000077">soscv.sharepoint.com/sites/WS_000077</a>
+      </div>
+    </div>
+  </div>
+
+</main>
+</body>
+</html>
