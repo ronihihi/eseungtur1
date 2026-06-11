@@ -23,26 +23,55 @@ function fmtDate(date: Date): string {
 
 /**
  * Convert field coordinates from "displayed page space" (top-left origin, fractions
- * of the DISPLAYED page which may be rotated) to "pdf-lib drawing space" (bottom-left
- * origin, un-rotated MediaBox units).
+ * of the DISPLAYED canvas) to "pdf-lib drawing space" (bottom-left origin,
+ * un-rotated MediaBox units).
  *
- * PDF rotation is stored in degrees CW. When a page has rotation R, the viewer
- * displays it rotated so the user sees a different orientation. Our field overlays
- * are placed as fractions of the DISPLAYED page, so we must undo the rotation to
- * get back to the drawing coordinate system.
+ * pdfjs renders a page with Rotate=R by producing a canvas whose axes map to the
+ * un-rotated MediaBox as follows:
  *
- * Returns { x, y, w, h } in pdf-lib units (bottom-left origin, un-rotated).
+ *   R=0:   canvas_x = pdf_x,       canvas_y = ph - pdf_y    (standard y-flip)
+ *   R=90:  canvas_x = pdf_y,       canvas_y = pdf_x         (canvas W=ph, H=pw)
+ *   R=180: canvas_x = pw - pdf_x,  canvas_y = ph - pdf_y    (both flipped)
+ *   R=270: canvas_x = ph - pdf_y,  canvas_y = pw - pdf_x    (canvas W=ph, H=pw)
+ *
+ * Inverting each mapping gives the pdf-lib (bottom-left) position of the
+ * bottom-left corner of the field box.
+ *
+ * Returns { x, y, w, h } in pdf-lib units (bottom-left origin, un-rotated MediaBox).
  */
 function toDrawCoords(
-  fx: number, fy: number, fw: number, fh: number, // fractional, display-space
-  pw: number, ph: number,                          // un-rotated MediaBox size
+  fx: number, fy: number, fw: number, fh: number, // fractional, display canvas space
+  pw: number, ph: number,                          // un-rotated MediaBox size (pdf-lib)
   rotation: number                                 // 0 | 90 | 180 | 270 (CW degrees)
 ): { x: number; y: number; w: number; h: number } {
   switch (rotation) {
     case 90:
-      // 90° CW: display top-left=(pw,ph), top-right=(pw,0), bottom-left=(0,ph), bottom-right=(0,0)
-      // x_mb = pw*(1-fy),  y_mb = ph*(1-fx)
-      // pdf-lib bottom-left corner of field box:
+      // Canvas W=ph, H=pw.  canvas_x=pdf_y, canvas_y=pdf_x
+      // Field canvas: left=fx*ph, top=fy*pw, w=fw*ph, h=fh*pw
+      // PDF x = canvas_y → [fy*pw … (fy+fh)*pw];  bottom-left x = fy*pw
+      // PDF y = canvas_x → [fx*ph … (fx+fw)*ph];  bottom-left y = fx*ph
+      return {
+        x: fy * pw,
+        y: fx * ph,
+        w: fh * pw,
+        h: fw * ph,
+      };
+
+    case 180:
+      // Canvas W=pw, H=ph.  canvas_x=pw-pdf_x, canvas_y=ph-pdf_y
+      // PDF x = pw - canvas_x → pw - (fx+fw)*pw … pw-fx*pw; bottom-left x = pw*(1-fx-fw)
+      // PDF y = ph - canvas_y → ph - (fy+fh)*ph … ph-fy*ph; bottom-left y = ph*(1-fy-fh)
+      return {
+        x: pw * (1 - fx - fw),
+        y: ph * (1 - fy - fh),
+        w: fw * pw,
+        h: fh * ph,
+      };
+
+    case 270:
+      // Canvas W=ph, H=pw.  canvas_x=ph-pdf_y, canvas_y=pw-pdf_x
+      // PDF x = pw - canvas_y → [pw-(fy+fh)*pw … pw-fy*pw]; bottom-left x = pw*(1-fy-fh)
+      // PDF y = ph - canvas_x → [ph-(fx+fw)*ph … ph-fx*ph]; bottom-left y = ph*(1-fx-fw)
       return {
         x: pw * (1 - fy - fh),
         y: ph * (1 - fx - fw),
@@ -50,30 +79,10 @@ function toDrawCoords(
         h: fw * ph,
       };
 
-    case 180:
-      // 180°: display top-left=(pw,0), axes both flipped.
-      // x_mb = pw*(1-fx),  y_mb = ph*fy
-      return {
-        x: pw * (1 - fx - fw),
-        y: ph * fy,
-        w: fw * pw,
-        h: fh * ph,
-      };
-
-    case 270:
-      // 270° CW (= 90° CCW): display top-left=(0,0), top-right=(0,ph), bottom-left=(pw,0)
-      // x_mb = pw*fy,  y_mb = ph*fx
-      return {
-        x: pw * fy,
-        y: ph * fx,
-        w: fh * pw,
-        h: fw * ph,
-      };
-
-    default: // 0 — standard top-left → bottom-left flip
+    default: // 0° — standard: canvas_x=pdf_x, canvas_y=ph-pdf_y
       return {
         x: fx * pw,
-        y: ph - fy * ph - fh * ph,
+        y: ph * (1 - fy - fh),
         w: fw * pw,
         h: fh * ph,
       };
@@ -139,38 +148,18 @@ export async function buildSignedPdf(
         page.drawText(`Signed: ${fmtDate(entry.signedAt)}`, { x: bx, y: dateY, size: fs, font, color: rgb(0.38, 0.38, 0.38) });
       }
     } else {
-      // Date or text field — filled rectangle with text inside
+      // Date or text field — transparent background, just draw the value text
       const value = entry.fieldType === "date" && !entry.fieldValue
         ? fmtDate(entry.signedAt)
         : entry.fieldValue;
 
       const fs = Math.max(7, Math.min(11, bh * 0.55));
-
-      const fillColor = entry.fieldType === "date"
-        ? rgb(0.92, 0.95, 1.0)
-        : rgb(0.95, 1.0, 0.95);
-
-      page.drawRectangle({
-        x: bx, y: by, width: bw, height: bh,
-        color: fillColor,
-        borderColor: rgb(0.65, 0.75, 0.85),
-        borderWidth: 0.75,
-      });
-
       const textY = by + (bh - fs) / 2;
       page.drawText(value, {
         x: bx + 4, y: textY, size: fs, font: fontBold,
         color: rgb(0.08, 0.08, 0.35),
         maxWidth: bw - 8,
       });
-
-      // Small label below
-      const labelFs = Math.max(4.5, fs * 0.6);
-      const labelY = by - labelFs - 1;
-      if (labelY > 4) {
-        const label = `${entry.signerName} · ${fmtDate(entry.signedAt)}`;
-        page.drawText(label, { x: bx, y: labelY, size: labelFs, font, color: rgb(0.5, 0.5, 0.5) });
-      }
     }
   }
 

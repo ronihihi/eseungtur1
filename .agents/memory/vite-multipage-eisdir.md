@@ -7,7 +7,7 @@ description: Why multi-page rollupOptions.input causes EISDIR in production buil
 
 Never use `rollupOptions.input` with multiple HTML entry points in Vite 7 production builds for this project. Use a `closeBundle` plugin hook to generate additional HTML variants from the built `index.html` instead.
 
-**Why:** Vite 7's `vite:build-html` plugin's `processAssetUrl`/`fileToBuiltUrl` path hits EISDIR when processing HTML files listed as multi-page inputs in the deployment container (even though local builds succeed). Root-relative hrefs like `href="/"` in `<link>` tags and possibly anchor tags in static-shell HTML trigger it. The production deployment container and local dev container resolve paths differently enough that the local build succeeds while the deployment build fails.
+**Why:** Vite 7's `vite:build-html` plugin's `processAssetUrl`/`fileToBuiltUrl` path hits EISDIR when processing HTML files listed as multi-page inputs in the deployment container (even though local builds succeed). Root-relative hrefs like `href="/"` in `<link>` tags and anchor tags in static-shell HTML can trigger it. The production deployment container and local dev container resolve paths differently enough that the local build succeeds while the deployment build fails.
 
 **How to apply:** When a second HTML entry is needed (e.g. `sign.html` for noindex), generate it as a post-build artifact by reading the built `index.html` and patching it in a `closeBundle` hook gated on `NODE_ENV === "production"`. The source `sign.html` file (used by the dev middleware) stays in the project root for dev-mode serving, but is NOT included in `rollupOptions.input`.
 
