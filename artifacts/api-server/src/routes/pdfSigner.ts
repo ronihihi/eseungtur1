@@ -21,6 +21,62 @@ function fmtDate(date: Date): string {
   }).format(date);
 }
 
+/**
+ * Convert field coordinates from "displayed page space" (top-left origin, fractions
+ * of the DISPLAYED page which may be rotated) to "pdf-lib drawing space" (bottom-left
+ * origin, un-rotated MediaBox units).
+ *
+ * PDF rotation is stored in degrees CW. When a page has rotation R, the viewer
+ * displays it rotated so the user sees a different orientation. Our field overlays
+ * are placed as fractions of the DISPLAYED page, so we must undo the rotation to
+ * get back to the drawing coordinate system.
+ *
+ * Returns { x, y, w, h } in pdf-lib units (bottom-left origin, un-rotated).
+ */
+function toDrawCoords(
+  fx: number, fy: number, fw: number, fh: number, // fractional, display-space
+  pw: number, ph: number,                          // un-rotated MediaBox size
+  rotation: number                                 // 0 | 90 | 180 | 270 (CW degrees)
+): { x: number; y: number; w: number; h: number } {
+  switch (rotation) {
+    case 90:
+      // Display: ph wide × pw tall (swapped).
+      // Forward map (display → un-rotated): x_p = fy*pw, y_p = fx*ph (then flip Y for pdf-lib)
+      return {
+        x: fy * pw,
+        y: fx * ph,
+        w: fh * pw,
+        h: fw * ph,
+      };
+
+    case 180:
+      // Display: pw wide × ph tall (same size, flipped both axes).
+      return {
+        x: pw * (1 - fx - fw),
+        y: ph * fy,
+        w: fw * pw,
+        h: fh * ph,
+      };
+
+    case 270:
+      // Display: ph wide × pw tall (swapped, opposite direction to 90).
+      return {
+        x: pw * (1 - fy - fh),
+        y: ph * (1 - fx - fw),
+        w: fh * pw,
+        h: fw * ph,
+      };
+
+    default: // 0 — standard top-left → bottom-left flip
+      return {
+        x: fx * pw,
+        y: ph - fy * ph - fh * ph,
+        w: fw * pw,
+        h: fh * ph,
+      };
+  }
+}
+
 export async function buildSignedPdf(
   source: string | Buffer,
   entries: FieldEntry[]
@@ -38,15 +94,14 @@ export async function buildSignedPdf(
     if (pageIdx < 0 || pageIdx >= pages.length) continue;
     const page = pages[pageIdx];
     const { width: pw, height: ph } = page.getSize();
+    const rotation = page.getRotation().angle; // 0 | 90 | 180 | 270
 
-    // Convert fractional coords (top-left origin) → pdf-lib coords (bottom-left origin)
-    const fx = entry.x * pw;
-    const fw = entry.width * pw;
-    const fh = entry.height * ph;
-    const fy = ph - entry.y * ph - fh;
+    const { x: bx, y: by, w: bw, h: bh } = toDrawCoords(
+      entry.x, entry.y, entry.width, entry.height,
+      pw, ph, rotation
+    );
 
     if (entry.fieldType === "signature" || entry.fieldType === "initials") {
-      // Render as image
       const match = entry.fieldValue.match(/^data:image\/png;base64,(.+)$/);
       if (!match) continue;
 
@@ -57,62 +112,61 @@ export async function buildSignedPdf(
         continue;
       }
 
-      // Signature image centred and scaled to fit
+      // Scale signature image to fit inside the field box with a small pad
       const sigPad = 4;
-      const scale = Math.min((fw - sigPad * 2) / pngImage.width, (fh - sigPad * 2) / pngImage.height);
+      const scale = Math.min((bw - sigPad * 2) / pngImage.width, (bh - sigPad * 2) / pngImage.height);
       const sigW = pngImage.width * scale;
       const sigH = pngImage.height * scale;
       page.drawImage(pngImage, {
-        x: fx + (fw - sigW) / 2,
-        y: fy + (fh - sigH) / 2,
-        width: sigW, height: sigH,
+        x: bx + (bw - sigW) / 2,
+        y: by + (bh - sigH) / 2,
+        width: sigW,
+        height: sigH,
       });
 
-      // Name + date below the field box
-      const fs = Math.max(5.5, Math.min(7.5, fw / 18));
+      // Name + date printed just below the field box
+      const fs = Math.max(5.5, Math.min(7.5, bw / 18));
       const lineH = fs + 2;
-      const nameY = fy - lineH;
-      const dateY = fy - lineH * 2;
+      const nameY = by - lineH;
+      const dateY = by - lineH * 2;
       if (nameY > 4) {
-        page.drawText(entry.signerName, { x: fx, y: nameY, size: fs, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+        page.drawText(entry.signerName, { x: bx, y: nameY, size: fs, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
       }
       if (dateY > 4) {
-        page.drawText(`Signed: ${fmtDate(entry.signedAt)}`, { x: fx, y: dateY, size: fs, font, color: rgb(0.38, 0.38, 0.38) });
+        page.drawText(`Signed: ${fmtDate(entry.signedAt)}`, { x: bx, y: dateY, size: fs, font, color: rgb(0.38, 0.38, 0.38) });
       }
     } else {
-      // Text or date — render as plain text inside a box
+      // Date or text field — filled rectangle with text inside
       const value = entry.fieldType === "date" && !entry.fieldValue
         ? fmtDate(entry.signedAt)
         : entry.fieldValue;
 
-      const fs = Math.max(7, Math.min(11, fh * 0.55));
+      const fs = Math.max(7, Math.min(11, bh * 0.55));
 
-      // Light filled rect
       const fillColor = entry.fieldType === "date"
         ? rgb(0.92, 0.95, 1.0)
         : rgb(0.95, 1.0, 0.95);
 
       page.drawRectangle({
-        x: fx, y: fy, width: fw, height: fh,
+        x: bx, y: by, width: bw, height: bh,
         color: fillColor,
         borderColor: rgb(0.65, 0.75, 0.85),
         borderWidth: 0.75,
       });
 
-      // Text centred vertically in the box
-      const textY = fy + (fh - fs) / 2;
+      const textY = by + (bh - fs) / 2;
       page.drawText(value, {
-        x: fx + 4, y: textY, size: fs, font: fontBold,
+        x: bx + 4, y: textY, size: fs, font: fontBold,
         color: rgb(0.08, 0.08, 0.35),
-        maxWidth: fw - 8,
+        maxWidth: bw - 8,
       });
 
-      // Tiny label below
+      // Small label below
       const labelFs = Math.max(4.5, fs * 0.6);
-      const labelY = fy - labelFs - 1;
+      const labelY = by - labelFs - 1;
       if (labelY > 4) {
         const label = `${entry.signerName} · ${fmtDate(entry.signedAt)}`;
-        page.drawText(label, { x: fx, y: labelY, size: labelFs, font, color: rgb(0.5, 0.5, 0.5) });
+        page.drawText(label, { x: bx, y: labelY, size: labelFs, font, color: rgb(0.5, 0.5, 0.5) });
       }
     }
   }
