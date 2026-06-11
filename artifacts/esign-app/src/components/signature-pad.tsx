@@ -42,7 +42,9 @@ export function SignaturePad({ onSign, onClear }: SignaturePadProps) {
   /* ── Draw mode ── */
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const isDrawingRef = useRef(false);   // ref copy so global handlers always see current value
   const [hasDrawn, setHasDrawn] = useState(false);
+  const hasDrawnRef = useRef(false);    // ref copy for same reason
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
   const dpr = useRef(1);
 
@@ -102,6 +104,8 @@ export function SignaturePad({ onSign, onClear }: SignaturePadProps) {
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
     lastPoint.current = pos;
+    isDrawingRef.current = true;
+    hasDrawnRef.current = true;
     setIsDrawing(true);
     setHasDrawn(true);
   };
@@ -110,40 +114,62 @@ export function SignaturePad({ onSign, onClear }: SignaturePadProps) {
     e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
   ) => {
     e.preventDefault();
-    if (!isDrawing) return;
+    if (!isDrawingRef.current) return;
     const pos = getPos(e);
     const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx || !lastPoint.current) return;
+    if (!ctx) return;
 
-    // Quadratic Bézier through the midpoint: this turns sharp corners into smooth curves
+    if (!lastPoint.current) {
+      // Re-entering canvas after briefly leaving — start a fresh segment
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+      lastPoint.current = pos;
+      return;
+    }
+
+    // Quadratic Bézier through the midpoint: turns sharp corners into smooth curves
     const mid = {
       x: (lastPoint.current.x + pos.x) / 2,
       y: (lastPoint.current.y + pos.y) / 2,
     };
     ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, mid.x, mid.y);
     ctx.stroke();
-    // Start the next segment from the midpoint so curves connect smoothly
     ctx.beginPath();
     ctx.moveTo(mid.x, mid.y);
-
     lastPoint.current = pos;
   };
 
+  /* Break the current stroke segment when the pointer leaves the canvas,
+     but do NOT end drawing — the user may re-enter and continue. */
+  const breakStroke = () => {
+    lastPoint.current = null;
+  };
+
   const stopDrawing = () => {
-    if (!isDrawing) return;
-    // Draw a final dot if the user just clicked without moving
+    if (!isDrawingRef.current) return;
     const ctx = canvasRef.current?.getContext("2d");
     if (ctx && lastPoint.current) {
       ctx.lineTo(lastPoint.current.x + 0.1, lastPoint.current.y + 0.1);
       ctx.stroke();
     }
     lastPoint.current = null;
+    isDrawingRef.current = false;
     setIsDrawing(false);
-    if (hasDrawn && canvasRef.current) {
-      // Export at full resolution
+    if (hasDrawnRef.current && canvasRef.current) {
       onSign(canvasRef.current.toDataURL("image/png"));
     }
   };
+
+  /* Global mouseup — stops drawing even if the pointer is outside the canvas */
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDrawingRef.current) stopDrawing();
+    };
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
+  // stopDrawing is stable (no deps change), safe to omit from array
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ── Clear ── */
   const clearCanvas = () => {
@@ -248,8 +274,7 @@ export function SignaturePad({ onSign, onClear }: SignaturePadProps) {
               ref={canvasRef}
               onMouseDown={startDrawing}
               onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
+              onMouseLeave={breakStroke}
               onTouchStart={startDrawing}
               onTouchMove={draw}
               onTouchEnd={stopDrawing}

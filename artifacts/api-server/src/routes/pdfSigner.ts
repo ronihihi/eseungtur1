@@ -214,16 +214,16 @@ export async function buildSignedPdf(
         thickness: 0.5, color: rgb(0.75, 0.75, 0.75),
       });
 
-      // Signer name at visual 72%
+      // Signer name at visual 76% (extra gap below divider at 65%)
       const nameFs = Math.max(4.5, Math.min(6.5, Math.min(dispW, dispH) * 0.14));
-      const nameOpts = labelAt(rotation, bx, by, bw, bh, nameFs, 0.72, 3);
+      const nameOpts = labelAt(rotation, bx, by, bw, bh, nameFs, 0.76, 3);
       page.drawText(entry.signerName, {
         x: nameOpts.x, y: nameOpts.y, size: nameFs,
         rotate: nameOpts.rotate, font: fontBold,
         color: rgb(0.1, 0.1, 0.1),
       });
 
-      // Signed date at visual 88%
+      // Signed date at visual 90%
       const dateFs = Math.max(4, Math.min(5.5, Math.min(dispW, dispH) * 0.11));
       const dateOpts = labelAt(rotation, bx, by, bw, bh, dateFs, 0.88, 3);
       page.drawText(`Signed: ${fmtDate(entry.signedAt)}`, {
