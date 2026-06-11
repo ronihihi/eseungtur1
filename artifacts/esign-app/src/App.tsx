@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,13 +9,14 @@ import { useGetMe } from "@workspace/api-client-react";
 
 import { Layout } from "@/components/layout";
 import { AuthPage } from "@/pages/auth";
-import { DashboardPage } from "@/pages/dashboard";
-import { UploadPage } from "@/pages/upload";
-import { DocumentDetailPage } from "@/pages/document-detail";
 import { SignPage } from "@/pages/sign";
-import { AdminUsersPage } from "@/pages/admin-users";
-import { AdminAuditPage } from "@/pages/admin-audit";
-import NotFound from "@/pages/not-found";
+
+const DashboardPage = lazy(() => import("@/pages/dashboard").then((m) => ({ default: m.DashboardPage })));
+const UploadPage = lazy(() => import("@/pages/upload").then((m) => ({ default: m.UploadPage })));
+const DocumentDetailPage = lazy(() => import("@/pages/document-detail").then((m) => ({ default: m.DocumentDetailPage })));
+const AdminUsersPage = lazy(() => import("@/pages/admin-users").then((m) => ({ default: m.AdminUsersPage })));
+const AdminAuditPage = lazy(() => import("@/pages/admin-audit").then((m) => ({ default: m.AdminAuditPage })));
+const NotFound = lazy(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,26 +82,28 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/auth" component={AuthPage} />
-      <Route path="/sign/:token" component={SignPage} />
-      <Route path="/">
-        <ProtectedRoute component={DashboardPage} />
-      </Route>
-      <Route path="/documents/upload">
-        <ProtectedRoute component={UploadPage} />
-      </Route>
-      <Route path="/documents/:id">
-        <ProtectedRoute component={DocumentDetailPage} />
-      </Route>
-      <Route path="/admin/users">
-        <AdminRoute component={AdminUsersPage} />
-      </Route>
-      <Route path="/admin/audit">
-        <AdminRoute component={AdminAuditPage} />
-      </Route>
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<LoadingScreen />}>
+      <Switch>
+        <Route path="/auth" component={AuthPage} />
+        <Route path="/sign/:token" component={SignPage} />
+        <Route path="/">
+          <ProtectedRoute component={DashboardPage} />
+        </Route>
+        <Route path="/documents/upload">
+          <ProtectedRoute component={UploadPage} />
+        </Route>
+        <Route path="/documents/:id">
+          <ProtectedRoute component={DocumentDetailPage} />
+        </Route>
+        <Route path="/admin/users">
+          <AdminRoute component={AdminUsersPage} />
+        </Route>
+        <Route path="/admin/audit">
+          <AdminRoute component={AdminAuditPage} />
+        </Route>
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 

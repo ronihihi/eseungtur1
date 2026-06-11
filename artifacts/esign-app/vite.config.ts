@@ -83,6 +83,22 @@ export default defineConfig({
         main: path.resolve(import.meta.dirname, "index.html"),
         sign: path.resolve(import.meta.dirname, "sign.html"),
       },
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/react-pdf") || id.includes("node_modules/pdfjs-dist")) {
+            return "vendor-pdf";
+          }
+          if (id.includes("node_modules/@tanstack")) {
+            return "vendor-query";
+          }
+          if (id.includes("node_modules/react") || id.includes("node_modules/scheduler")) {
+            return "vendor-react";
+          }
+          if (id.includes("node_modules/")) {
+            return "vendor";
+          }
+        },
+      },
     },
   },
   server: {
