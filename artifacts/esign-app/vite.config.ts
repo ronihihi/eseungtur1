@@ -82,17 +82,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // Only split out PDF.js — it's large (~420KB) and self-contained.
+          // Let Vite handle everything else automatically to avoid circular chunk deps.
           if (id.includes("node_modules/react-pdf") || id.includes("node_modules/pdfjs-dist")) {
             return "vendor-pdf";
-          }
-          if (id.includes("node_modules/@tanstack")) {
-            return "vendor-query";
-          }
-          if (id.includes("node_modules/react") || id.includes("node_modules/scheduler")) {
-            return "vendor-react";
-          }
-          if (id.includes("node_modules/")) {
-            return "vendor";
           }
         },
       },
