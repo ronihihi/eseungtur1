@@ -3,13 +3,98 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WorkFlowSign SOS Village Palestine</title>
+
+    <title>WorkflowSign — Professional E-Signature Platform</title>
+    <meta name="description" content="Send, sign, and track documents from anywhere with WorkflowSign. Collect legally binding e-signatures, invite up to 20 recipients, and get a full audit trail — no printing, no faxing, no waiting." />
+
+    <!-- Open Graph / Facebook / LinkedIn -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="WorkflowSign" />
+    <meta property="og:title" content="WorkflowSign — Professional E-Signature Platform" />
+    <meta property="og:description" content="Send, sign, and track documents from anywhere. Collect legally binding e-signatures with full audit trails. No printing, no faxing, no waiting." />
+    <meta property="og:image" content="/opengraph.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="WorkflowSign — e-signature platform screenshot" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="WorkflowSign — Professional E-Signature Platform" />
+    <meta name="twitter:description" content="Send, sign, and track documents from anywhere. Collect legally binding e-signatures with full audit trails." />
+    <meta name="twitter:image" content="/opengraph.jpg" />
+
+    <!-- Canonical (SPA default; per-route overrides handled by React) -->
+    <link rel="canonical" href="/" />
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "WorkflowSign",
+      "description": "Professional e-signature platform for teams. Send, sign, and track documents with legally binding signatures, full audit trails, and sequential or simultaneous signing flows.",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0"
+      },
+      "featureList": [
+        "Legally binding e-signatures",
+        "Up to 20 recipients per document",
+        "Sequential and simultaneous signing",
+        "Full audit trail with timestamps",
+        "PDF and DOCX document support"
+      ]
+    }
+    </script>
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Hide static prerender as soon as JS is available, before React loads -->
+    <style>
+      .js #static-shell { display: none !important; }
+    </style>
+    <script>document.documentElement.classList.add('js');</script>
   </head>
   <body>
+    <!--
+      Static shell: visible only to non-JS crawlers (Twitter/LinkedIn bots, GPTBot,
+      ClaudeBot, etc.). An inline <script> above adds class="js" to <html>
+      immediately, which triggers the CSS rule that hides this block — so real
+      users never see it.
+    -->
+    <div id="static-shell" aria-hidden="true">
+      <header>
+        <a href="/">
+          <strong>WorkflowSign</strong>
+        </a>
+      </header>
+      <main>
+        <section>
+          <h1>Signatures your whole team can trust</h1>
+          <p>Send, sign, and track documents from anywhere — no printing, no faxing, no waiting.</p>
+          <ul>
+            <li>Collect legally binding e-signatures</li>
+            <li>Invite up to 20 recipients per document</li>
+            <li>Sequential or simultaneous signing flows</li>
+            <li>Full audit trail with timestamps</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Sign in to your workspace</h2>
+          <p>Enter your email and password to access WorkflowSign, or create a free account to get started.</p>
+          <p><a href="/auth">Sign in or create an account</a></p>
+        </section>
+      </main>
+      <footer>
+        <p>WorkflowSign — Professional e-signature platform for teams.</p>
+      </footer>
+    </div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
