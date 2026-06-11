@@ -57,11 +57,10 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-[100dvh] flex flex-col bg-background">
       <header className="sticky top-0 z-30 w-full border-b bg-card/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2 font-bold text-base text-foreground shrink-0">
-            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shadow-sm">
-              <FileSignature className="h-4 w-4 text-primary-foreground" />
+          <Link href="/" className="flex items-center shrink-0">
+            <div className="rounded-lg bg-[#1c325d] px-3 py-1.5">
+              <img src="/sos-logo.png" alt="SOS Children's Villages Palestine" className="h-7 w-auto object-contain" />
             </div>
-            <span className="hidden sm:inline">WorkFlowSign SOS Village Palestine</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">

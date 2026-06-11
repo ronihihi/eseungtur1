@@ -131,11 +131,8 @@ export function AuthPage() {
         <div className="absolute inset-0 opacity-[0.06]"
           style={{ backgroundImage: "radial-gradient(circle at 60% 40%, hsl(198 100% 44%), transparent 60%)" }} />
 
-        <div className="relative z-10 flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center shadow-lg">
-            <FileSignature className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-white font-bold text-lg tracking-tight">WorkFlowSign SOS Village Palestine</span>
+        <div className="relative z-10">
+          <img src="/sos-logo.png" alt="SOS Children's Villages Palestine" className="h-12 w-auto object-contain" />
         </div>
 
         <div className="relative z-10 space-y-8">
@@ -170,11 +167,10 @@ export function AuthPage() {
         <div className="w-full max-w-sm space-y-7">
 
           {/* Mobile logo */}
-          <div className="flex flex-col items-center gap-2 text-center lg:hidden">
-            <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center shadow">
-              <FileSignature className="h-6 w-6 text-primary-foreground" />
+          <div className="flex flex-col items-center gap-3 text-center lg:hidden">
+            <div className="rounded-xl bg-[#1c325d] px-5 py-3">
+              <img src="/sos-logo.png" alt="SOS Children's Villages Palestine" className="h-10 w-auto object-contain" />
             </div>
-            <h1 className="text-xl font-bold tracking-tight">WorkFlowSign SOS Village Palestine</h1>
             <p className="text-muted-foreground text-sm">Professional document signing for teams</p>
           </div>
 

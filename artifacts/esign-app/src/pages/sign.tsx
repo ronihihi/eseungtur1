@@ -338,9 +338,10 @@ export function SignPage() {
       <div className="min-h-[100dvh] flex flex-col bg-muted/30">
         <header className="bg-card border-b py-4 sticky top-0 z-10">
           <div className="container mx-auto px-4 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2 font-semibold text-primary hover:opacity-80 transition-opacity">
-              <FileSignature className="h-5 w-5" />
-              <span>WorkFlowSign SOS Village Palestine</span>
+            <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+              <div className="rounded-lg bg-[#1c325d] px-3 py-1.5">
+                <img src="/sos-logo.png" alt="SOS Children's Villages Palestine" className="h-8 w-auto object-contain" />
+              </div>
             </Link>
             {data.documentStatus === "completed" ? (
               <a href={`/api/sign/${token}/download`} download={data.documentFilename || "document.pdf"}>
@@ -438,9 +439,10 @@ export function SignPage() {
     <div className="min-h-[100dvh] flex flex-col bg-muted/30">
       <header className="bg-card border-b py-4 sticky top-0 z-10">
         <div className="container mx-auto px-4 flex items-center gap-2">
-          <Link href="/" className="flex items-center gap-2 font-semibold text-primary hover:opacity-80 transition-opacity">
-            <FileSignature className="h-5 w-5" />
-            <span>WorkFlowSign SOS Village Palestine</span>
+          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+            <div className="rounded-lg bg-[#1c325d] px-3 py-1.5">
+              <img src="/sos-logo.png" alt="SOS Children's Villages Palestine" className="h-8 w-auto object-contain" />
+            </div>
           </Link>
         </div>
       </header>
