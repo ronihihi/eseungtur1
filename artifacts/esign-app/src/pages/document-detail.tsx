@@ -89,7 +89,7 @@ interface FieldItem {
 }
 
 const FIELD_TYPES: { type: FieldType; label: string; icon: React.ElementType; defaultW: number; defaultH: number }[] = [
-  { type: "signature", label: "Signature", icon: PenLine, defaultW: 0.18, defaultH: 0.050 },
+  { type: "signature", label: "Signature", icon: PenLine, defaultW: 0.22, defaultH: 0.06 },
   { type: "initials", label: "Initials", icon: Pen, defaultW: 0.08, defaultH: 0.038 },
   { type: "date", label: "Date Signed", icon: CalendarDays, defaultW: 0.13, defaultH: 0.032 },
   { type: "text", label: "Text", icon: Type, defaultW: 0.16, defaultH: 0.032 },
