@@ -25,17 +25,6 @@ function fmtDate(date: Date): string {
  * Convert field coordinates from "displayed page space" (top-left origin, fractions
  * of the DISPLAYED canvas) to "pdf-lib drawing space" (bottom-left origin,
  * un-rotated MediaBox units).
- *
- * pdfjs renders a page with Rotate=R by producing a canvas whose axes map to the
- * un-rotated MediaBox as follows:
- *
- *   R=0:   canvas_x = pdf_x,       canvas_y = ph - pdf_y    (standard y-flip)
- *   R=90:  canvas_x = pdf_y,       canvas_y = pdf_x         (canvas W=ph, H=pw)
- *   R=180: canvas_x = pw - pdf_x,  canvas_y = ph - pdf_y    (both flipped)
- *   R=270: canvas_x = ph - pdf_y,  canvas_y = pw - pdf_x    (canvas W=ph, H=pw)
- *
- * Inverting each mapping gives the pdf-lib (bottom-left) position of the
- * bottom-left corner of the field box.
  */
 function toDrawCoords(
   fx: number, fy: number, fw: number, fh: number,
@@ -55,13 +44,70 @@ function toDrawCoords(
 }
 
 /**
- * Compute (x, y, rotate) for text drawn via pdf-lib so that it appears horizontal
- * to the viewer at visual position `frac` through the box (0 = visual top, 1 = visual bottom).
+ * Return the DISPLAY dimensions of the field box (width × height as seen by the viewer).
+ * For R=90/270 the MediaBox x/y axes are swapped relative to display.
+ */
+function displaySize(rotation: number, bw: number, bh: number): [number, number] {
+  return rotation === 90 || rotation === 270 ? [bh, bw] : [bw, bh];
+}
+
+/**
+ * Compute anchor (x, y) for page.drawImage(..., { rotate: degrees(rotation) })
+ * such that the drawn image (drawW × drawH in pdf-lib units) is centered
+ * at visual fraction (0.5, topFrac + drawFrac/2) inside the field box —
+ * i.e. horizontally centered and positioned in the visual upper portion.
  *
- * When a page has Rotate=R, pdf-lib draws in the un-rotated MediaBox coordinate space
- * and the viewer then rotates everything R° CW. Passing `rotate: degrees(R)` to
- * drawText pre-rotates the text so it cancels out the page rotation and appears upright.
- * The anchor (x, y) is adjusted so the glyph body lands in the correct strip.
+ * Math: drawImage with rotate=R° CCW places the image so that its natural
+ * bottom-left corner stays at (x,y).  After rotation the bounding center is:
+ *   R=0:   (x + w/2,  y + h/2)
+ *   R=90:  (x - h/2,  y + w/2)
+ *   R=180: (x - w/2,  y - h/2)
+ *   R=270: (x + h/2,  y - w/2)
+ * We solve for (x,y) given the desired MediaBox center.
+ */
+function imageAnchor(
+  rotation: number,
+  bx: number, by: number, bw: number, bh: number,
+  drawW: number, drawH: number,
+  imgFrac: number   // visual fraction of box height occupied by image zone
+): [number, number] {
+  // Center of image zone in MediaBox coords:
+  //   R=0,180: visual-top = large-y side; image zone center → y = by + bh*(1 - imgFrac/2), x center = bx + bw/2
+  //   R=90:    visual-top = small-x side; image zone center → x = bx + bw*(imgFrac/2),        y center = by + bh/2
+  //   R=270:   visual-top = large-x side; image zone center → x = bx + bw*(1 - imgFrac/2),    y center = by + bh/2
+  switch (rotation) {
+    case 90: {
+      const cx = bx + bw * (imgFrac / 2);
+      const cy = by + bh / 2;
+      return [cx + drawH / 2, cy - drawW / 2];
+    }
+    case 180: {
+      const cx = bx + bw / 2;
+      const cy = by + bh * (1 - imgFrac / 2);
+      return [cx + drawW / 2, cy + drawH / 2];
+    }
+    case 270: {
+      const cx = bx + bw * (1 - imgFrac / 2);
+      const cy = by + bh / 2;
+      return [cx - drawH / 2, cy + drawW / 2];
+    }
+    default: { // 0
+      const cx = bx + bw / 2;
+      const cy = by + bh * (1 - imgFrac / 2);
+      return [cx - drawW / 2, cy - drawH / 2];
+    }
+  }
+}
+
+/**
+ * Compute {x, y, rotate} for text drawn via pdf-lib so it appears horizontal
+ * to the viewer at visual position `frac` through the box (0=visual-top, 1=visual-bottom).
+ *
+ * Axis mapping (canvas y goes DOWN, MediaBox y goes UP):
+ *   R=0:   visual-top = high MediaBox y;  text advances in +x
+ *   R=90:  visual-top = low  MediaBox x;  text advances in +y; glyph height in −x
+ *   R=180: visual-top = high MediaBox y (same axis as R=0); text advances in −x; glyph height in −y
+ *   R=270: visual-top = high MediaBox x;  text advances in −y; glyph height in +x
  */
 function labelAt(
   pageRot: number,
@@ -73,43 +119,23 @@ function labelAt(
   const shift = fs * 0.3;
   switch (pageRot) {
     case 90:
-      // visual-Y = MediaBox-X axis (frac=0 → small x, frac=1 → large x)
-      // text advances in +y; glyph height extends in −x direction
+      // visual-Y = MediaBox-X (frac=0 → bx, frac=1 → bx+bw); glyph extends in −x
       return { x: bx + bw * frac + shift, y: by + pad, rotate: degrees(90) };
     case 180:
-      // visual-Y = MediaBox-Y axis inverted (frac=0 → small y, frac=1 → large y)
-      // text advances in −x; glyph height extends in −y direction
-      return { x: bx + bw - pad, y: by + bh * frac + shift, rotate: degrees(180) };
+      // visual-Y = MediaBox-Y inverted same as R=0 (frac=0 → large y, frac=1 → small y)
+      // glyph extends in −y (descends from baseline) so shift baseline UP
+      return { x: bx + bw - pad, y: by + bh * (1 - frac) + shift, rotate: degrees(180) };
     case 270:
-      // visual-Y = MediaBox-X axis inverted (frac=0 → large x, frac=1 → small x)
-      // text advances in −y; glyph height extends in +x direction
+      // visual-Y = MediaBox-X inverted (frac=0 → bx+bw, frac=1 → bx); glyph extends in +x
       return { x: bx + bw * (1 - frac) - shift, y: by + bh - pad, rotate: degrees(270) };
     default: // 0
-      // visual-Y = MediaBox-Y axis (frac=0 → large y = top, frac=1 → small y = bottom)
-      // text advances in +x; glyph height extends in +y direction
+      // visual-Y = MediaBox-Y (frac=0 → large y, frac=1 → small y); glyph extends in +y
       return { x: bx + pad, y: by + bh * (1 - frac) - shift, rotate: degrees(0) };
   }
 }
 
 /**
- * Return the sub-box (in MediaBox coords) for the "visual top imgFrac of the field box".
- * Used to confine the signature image to the upper portion, leaving room for labels.
- */
-function imageSubBox(
-  pageRot: number,
-  bx: number, by: number, bw: number, bh: number,
-  imgFrac: number
-): [number, number, number, number] {
-  switch (pageRot) {
-    case 90:  return [bx,                   by, bw * imgFrac,       bh];
-    case 180: return [bx,                   by, bw,                 bh * imgFrac];
-    case 270: return [bx + bw * (1 - imgFrac), by, bw * imgFrac,   bh];
-    default:  return [bx, by + bh * (1 - imgFrac), bw,             bh * imgFrac];
-  }
-}
-
-/**
- * Return the two endpoints of the divider line between the image strip and label strip.
+ * Return the two endpoints of the divider line at the imgFrac boundary.
  */
 function dividerLine(
   pageRot: number,
@@ -117,10 +143,10 @@ function dividerLine(
   imgFrac: number
 ): [number, number, number, number] {
   switch (pageRot) {
-    case 90:  { const lx = bx + bw * imgFrac; return [lx, by, lx, by + bh]; }
-    case 180: { const ly = by + bh * imgFrac; return [bx, ly, bx + bw, ly]; }
-    case 270: { const lx = bx + bw * (1 - imgFrac); return [lx, by, lx, by + bh]; }
-    default:  { const ly = by + bh * (1 - imgFrac); return [bx, ly, bx + bw, ly]; }
+    case 90:  { const lx = bx + bw * imgFrac;           return [lx, by, lx, by + bh]; }
+    case 180: { const ly = by + bh * (1 - imgFrac);     return [bx, ly, bx + bw, ly]; }
+    case 270: { const lx = bx + bw * (1 - imgFrac);     return [lx, by, lx, by + bh]; }
+    default:  { const ly = by + bh * (1 - imgFrac);     return [bx, ly, bx + bw, ly]; }
   }
 }
 
@@ -159,26 +185,37 @@ export async function buildSignedPdf(
         continue;
       }
 
-      // Signature image occupies the visual top 62% of the field box
+      // Display dimensions: for R=90/270 the viewer swaps x/y axes
+      const [dispW, dispH] = displaySize(rotation, bw, bh);
+
+      // Image occupies visual top 62%; labels get the lower 38%
       const imgFrac = 0.62;
-      const [ix, iy, iw, ih] = imageSubBox(rotation, bx, by, bw, bh, imgFrac);
-      const sigPad = 3;
-      const scale = Math.min((iw - sigPad * 2) / pngImage.width, (ih - sigPad * 2) / pngImage.height);
-      const sigW = pngImage.width * scale;
-      const sigH = pngImage.height * scale;
+      const sigPad = 4;
+
+      // Scale to fit in display zone (dispW wide, dispH*imgFrac tall)
+      const scale = Math.min(
+        (dispW - sigPad * 2) / pngImage.width,
+        (dispH * imgFrac - sigPad * 2) / pngImage.height
+      );
+      const drawW = Math.max(1, pngImage.width * scale);
+      const drawH = Math.max(1, pngImage.height * scale);
+
+      const [imgX, imgY] = imageAnchor(rotation, bx, by, bw, bh, drawW, drawH, imgFrac);
       page.drawImage(pngImage, {
-        x: ix + (iw - sigW) / 2,
-        y: iy + (ih - sigH) / 2,
-        width: sigW,
-        height: sigH,
+        x: imgX, y: imgY,
+        width: drawW, height: drawH,
+        rotate: degrees(rotation),
       });
 
-      // Thin divider between image and label area
+      // Thin grey divider between image and label strip
       const [x1, y1, x2, y2] = dividerLine(rotation, bx, by, bw, bh, imgFrac);
-      page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: 0.5, color: rgb(0.75, 0.75, 0.75) });
+      page.drawLine({
+        start: { x: x1, y: y1 }, end: { x: x2, y: y2 },
+        thickness: 0.5, color: rgb(0.75, 0.75, 0.75),
+      });
 
-      // Signer name — at visual 75% (inside lower 38% strip)
-      const nameFs = Math.max(4.5, Math.min(6.5, Math.min(bw, bh) * 0.14));
+      // Signer name at visual 72%
+      const nameFs = Math.max(4.5, Math.min(6.5, Math.min(dispW, dispH) * 0.14));
       const nameOpts = labelAt(rotation, bx, by, bw, bh, nameFs, 0.72, 3);
       page.drawText(entry.signerName, {
         x: nameOpts.x, y: nameOpts.y, size: nameFs,
@@ -186,9 +223,9 @@ export async function buildSignedPdf(
         color: rgb(0.1, 0.1, 0.1),
       });
 
-      // Signed date — at visual 90%
-      const dateFs = Math.max(4, Math.min(5.5, Math.min(bw, bh) * 0.11));
-      const dateOpts = labelAt(rotation, bx, by, bw, bh, dateFs, 0.89, 3);
+      // Signed date at visual 88%
+      const dateFs = Math.max(4, Math.min(5.5, Math.min(dispW, dispH) * 0.11));
+      const dateOpts = labelAt(rotation, bx, by, bw, bh, dateFs, 0.88, 3);
       page.drawText(`Signed: ${fmtDate(entry.signedAt)}`, {
         x: dateOpts.x, y: dateOpts.y, size: dateFs,
         rotate: dateOpts.rotate, font,
@@ -196,12 +233,13 @@ export async function buildSignedPdf(
       });
 
     } else {
-      // Date or text field — draw value text, rotation-corrected and centered in the box
+      // Date or text field — draw the value text, rotation-corrected and centered
       const value = entry.fieldType === "date" && !entry.fieldValue
         ? fmtDate(entry.signedAt)
         : entry.fieldValue;
 
-      const fs = Math.max(7, Math.min(11, Math.min(bw, bh) * 0.45));
+      const [dispW, dispH] = displaySize(rotation, bw, bh);
+      const fs = Math.max(7, Math.min(11, Math.min(dispW, dispH) * 0.45));
       const opts = labelAt(rotation, bx, by, bw, bh, fs, 0.5, 4);
       page.drawText(value, {
         x: opts.x, y: opts.y, size: fs,
