@@ -188,14 +188,14 @@ export async function buildSignedPdf(
       // Display dimensions: for R=90/270 the viewer swaps x/y axes
       const [dispW, dispH] = displaySize(rotation, bw, bh);
 
-      // Image occupies visual top 62%; labels get the lower 38%
-      const imgFrac = 0.62;
-      const sigPad = 4;
+      // Image occupies visual top 65%; labels get the lower 35%
+      const imgFrac = 0.65;
 
-      // Scale to fit in display zone (dispW wide, dispH*imgFrac tall)
+      // DocuSign-style sizing: ~70% of field width, ~60% of field height
+      // Use display dimensions so the formula is correct for all page rotations
       const scale = Math.min(
-        (dispW - sigPad * 2) / pngImage.width,
-        (dispH * imgFrac - sigPad * 2) / pngImage.height
+        (dispW * 0.70) / pngImage.width,
+        (dispH * 0.60) / pngImage.height
       );
       const drawW = Math.max(1, pngImage.width * scale);
       const drawH = Math.max(1, pngImage.height * scale);
