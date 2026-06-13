@@ -164,7 +164,7 @@ function drawPageFooter(
   const lc = rgb(0.75, 0.75, 0.75);
   const tc = rgb(0.48, 0.48, 0.48);
 
-  const leftText = "Electronically signed via SOS E-Signature System";
+  const leftText = "Electronically signed via SOS Village - Palestine E-Signature System";
   const rightText = `Cert: ${certId}  \u00B7  Page ${pageNum} of ${totalPages}`;
 
   switch (rotation) {
@@ -239,7 +239,7 @@ async function addAuditPage(
   page.drawText("E-SIGNATURE CERTIFICATE", {
     x: margin, y: ph - 34, size: 17, font: fontBold, color: white,
   });
-  page.drawText("SOS Children\u2019s Villages Palestine  \u00B7  Electronic Signature System", {
+  page.drawText("SOS Village - Palestine  \u00B7  Electronic Signature System", {
     x: margin, y: ph - 53, size: 8.5, font, color: rgb(0.74, 0.84, 0.94),
   });
 
@@ -320,7 +320,7 @@ async function addAuditPage(
   // Legal notice box
   const noticeLines = [
     "This certificate is automatically generated proof that the above document was electronically signed.",
-    `All signatures were collected via SOS E-Signature System on ${fmtDate(doc.completedAt)}.`,
+    `All signatures were collected via SOS Village - Palestine E-Signature System on ${fmtDate(doc.completedAt)}.`,
     "The SHA-256 hash uniquely identifies this document at the moment signing was completed.",
   ];
   const noticeH = noticeLines.length * 14 + 14;
