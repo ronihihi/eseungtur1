@@ -274,7 +274,8 @@ async function addAuditPage(
   // ── Signing Record ─────────────────────────────────────────────────────────
   sectionLabel("SIGNING RECORD");
 
-  const colX = [margin, margin + 130, margin + 278, margin + 385, margin + 462];
+  // Column positions: Name(115) | Email(140) | Signed At(100) | IP(85) | Method(75) = 515
+  const colX = [margin, margin + 115, margin + 255, margin + 355, margin + 440];
   const colHeaders = ["SIGNER NAME", "EMAIL ADDRESS", "SIGNED AT (UTC)", "IP ADDRESS", "METHOD"];
   const rowH = 18;
 
@@ -289,11 +290,13 @@ async function addAuditPage(
     if (i % 2 === 1) {
       page.drawRectangle({ x: margin, y: y - rowH + 5, width: contentW, height: rowH, color: rgb(0.97, 0.97, 0.97) });
     }
+    // Show only the first (real client) IP — strip proxy hops after the first comma
+    const firstIp = s.ipAddress ? s.ipAddress.split(",")[0].trim() : "\u2014";
     const cells = [
-      truncate(s.name, 20),
-      truncate(s.email, 26),
+      truncate(s.name, 18),
+      truncate(s.email, 24),
       fmtDateTime(s.signedAt),
-      s.ipAddress || "\u2014",
+      firstIp,
       "Email Verification",
     ];
     cells.forEach((c, ci) => {
