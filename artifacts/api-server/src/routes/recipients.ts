@@ -4,7 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { db, documentsTable, recipientsTable, signatureFieldsTable } from "@workspace/db";
 import { SetRecipientsBody } from "@workspace/api-zod";
 import type { Request, Response } from "express";
-import { sendSigningEmail } from "./emailService.js";
+import { sendSigningEmail, sendReviewInviteEmail, sendSignUnlockEmail } from "./emailService.js";
 import { getAppBaseUrl } from "../lib/appUrl.js";
 
 const router: IRouter = Router();
@@ -45,14 +45,28 @@ router.post("/documents/:id/recipients", requireAuth, async (req: Request, res: 
 
     const newList = parsed.data.recipients;
 
-    // Update existing recipients in place (preserves IDs → field references stay valid)
     for (let i = 0; i < newList.length; i++) {
       const r = newList[i];
       const existingRec = existing[i];
+      const requiresReview = r.requiresReview ?? false;
+      const requiresSignature = r.requiresSignature ?? true;
+      const reviewChecklistInput = r.reviewChecklist;
+      const reviewChecklist = reviewChecklistInput
+        ? reviewChecklistInput.map((item) => ({ label: item.label, checked: false }))
+        : null;
+
       if (existingRec) {
         await db
           .update(recipientsTable)
-          .set({ teamName: r.teamName, email: r.email, signOrder: i + 1 })
+          .set({
+            teamName: r.teamName,
+            email: r.email,
+            signOrder: i + 1,
+            requiresReview,
+            requiresSignature,
+            reviewStatus: requiresReview ? (existingRec.reviewStatus ?? "pending") : null,
+            reviewChecklist: reviewChecklist as null,
+          })
           .where(eq(recipientsTable.id, existingRec.id));
       } else {
         await db.insert(recipientsTable).values({
@@ -63,11 +77,14 @@ router.post("/documents/:id/recipients", requireAuth, async (req: Request, res: 
           signOrder: i + 1,
           status: "pending",
           token: uuidv4(),
+          requiresReview,
+          requiresSignature,
+          reviewStatus: requiresReview ? "pending" : null,
+          reviewChecklist: reviewChecklist as null,
         });
       }
     }
 
-    // Remove recipients that were dropped from the list, along with their fields
     if (existing.length > newList.length) {
       for (const removed of existing.slice(newList.length)) {
         await db.delete(signatureFieldsTable).where(eq(signatureFieldsTable.recipientId, removed.id));
@@ -99,25 +116,38 @@ router.post("/documents/:id/send", requireAuth, async (req: Request, res: Respon
     }
 
     const doc = docs[0];
-    const recipients = await db.select().from(recipientsTable).where(eq(recipientsTable.documentId, id));
-    recipients.sort((a, b) => a.signOrder - b.signOrder);
+    const allRecipients = await db.select().from(recipientsTable).where(eq(recipientsTable.documentId, id));
+    allRecipients.sort((a, b) => a.signOrder - b.signOrder);
 
-    if (recipients.length === 0) {
+    if (allRecipients.length === 0) {
       res.status(400).json({ error: "No recipients added" });
       return;
     }
 
     const baseUrl = getAppBaseUrl(req);
 
-    const toSend = doc.signingOrder === "sequential" ? [recipients[0]] : recipients;
+    const reviewers = allRecipients.filter((r) => r.requiresReview);
+    const signers = allRecipients.filter((r) => r.requiresSignature && !r.requiresReview);
 
-    for (const r of toSend) {
-      await sendSigningEmail(r, doc, `${baseUrl}/sign/${r.token}`, subject, message, req.session.userName);
+    let sent = 0;
+
+    if (reviewers.length > 0) {
+      const toSendReviewers = doc.signingOrder === "sequential" ? [reviewers[0]] : reviewers;
+      for (const r of toSendReviewers) {
+        await sendReviewInviteEmail(r, doc, `${baseUrl}/review/${r.token}`, req.session.userName);
+        sent++;
+      }
+      await db.update(documentsTable).set({ status: "in_review" as string }).where(eq(documentsTable.id, id));
+    } else {
+      const toSend = doc.signingOrder === "sequential" ? [signers[0] ?? allRecipients[0]] : allRecipients;
+      for (const r of toSend) {
+        await sendSigningEmail(r, doc, `${baseUrl}/sign/${r.token}`, subject, message, req.session.userName);
+        sent++;
+      }
+      await db.update(documentsTable).set({ status: "sent" }).where(eq(documentsTable.id, id));
     }
 
-    await db.update(documentsTable).set({ status: "sent" }).where(eq(documentsTable.id, id));
-
-    res.json({ success: true, sent: toSend.length });
+    res.json({ success: true, sent });
   } catch (err) {
     req.log.error({ err }, "send document error");
     res.status(500).json({ error: "Internal server error" });
@@ -139,8 +169,8 @@ router.post("/recipients/:recipientId/remind", requireAuth, async (req: Request,
     }
 
     const r = recs[0];
-    if (r.status === "signed") {
-      res.status(400).json({ error: "Recipient has already signed" });
+    if (r.status === "signed" && (!r.requiresReview || r.reviewStatus === "approved")) {
+      res.status(400).json({ error: "Recipient has already completed their action" });
       return;
     }
 
@@ -154,17 +184,28 @@ router.post("/recipients/:recipientId/remind", requireAuth, async (req: Request,
       return;
     }
     const doc = docs[0];
-
     const baseUrl = getAppBaseUrl(req);
 
-    await sendSigningEmail(
-      r,
-      doc,
-      `${baseUrl}/sign/${r.token}`,
-      `Reminder: Please sign "${doc.title}"`,
-      "This is a reminder that your signature is required on this document.",
-      req.session.userName
-    );
+    if (r.requiresReview && (r.reviewStatus === null || r.reviewStatus === "pending")) {
+      await sendReviewInviteEmail(r, doc, `${baseUrl}/review/${r.token}`, req.session.userName);
+    } else if (r.requiresSignature && r.status !== "signed") {
+      const allRecipients = await db.select().from(recipientsTable).where(eq(recipientsTable.documentId, r.documentId));
+      const reviewers = allRecipients.filter((x) => x.requiresReview);
+      const gateOpen = reviewers.every((x) => x.reviewStatus === "approved");
+      const approvedNames = reviewers.filter((x) => x.reviewStatus === "approved").map((x) => x.signerName || x.teamName);
+      if (!gateOpen) {
+        res.status(400).json({ error: "Cannot send signing reminder — reviewers have not approved yet" });
+        return;
+      }
+      await sendSignUnlockEmail(r, doc, `${baseUrl}/sign/${r.token}`, approvedNames);
+    } else {
+      await sendSigningEmail(
+        r, doc, `${baseUrl}/sign/${r.token}`,
+        `Reminder: Please sign "${doc.title}"`,
+        "This is a reminder that your signature is required on this document.",
+        req.session.userName
+      );
+    }
 
     res.json({ success: true });
   } catch (err) {

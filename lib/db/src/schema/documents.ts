@@ -13,11 +13,15 @@ export const documentsTable = pgTable("documents", {
   status: text("status").notNull().default("draft"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
+  sealedPdfPath: text("sealed_pdf_path"),
+  sealedPdfHash: text("sealed_pdf_hash"),
 });
 
 export const insertDocumentSchema = createInsertSchema(documentsTable).omit({
   createdAt: true,
   completedAt: true,
+  sealedPdfPath: true,
+  sealedPdfHash: true,
 });
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documentsTable.$inferSelect;

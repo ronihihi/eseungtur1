@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import {
   ArrowLeft, Send, Plus, Trash2, Mail, CheckCircle2,
   Clock, BellRing, Copy, Check, Save, FileText, Download,
-  PenLine, Pen, CalendarDays, Type, Grip,
+  PenLine, Pen, CalendarDays, Type, Grip, ShieldCheck, Activity,
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
@@ -48,7 +48,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 const RECIPIENT_COLORS = [
   { bg: "rgba(59,130,246,0.15)",  border: "#3b82f6", text: "#1d4ed8" },
@@ -101,7 +101,12 @@ const FIELD_TYPE_LABEL: Record<FieldType, string> = {
 
 const recipientsSchema = z.object({
   recipients: z
-    .array(z.object({ teamName: z.string().min(1, "Name is required"), email: z.string().email("Valid email required") }))
+    .array(z.object({
+      teamName: z.string().min(1, "Name is required"),
+      email: z.string().email("Valid email required"),
+      requiresReview: z.boolean().optional(),
+      requiresSignature: z.boolean().optional(),
+    }))
     .min(1, "At least one recipient is required")
     .max(20, "Maximum 20 recipients allowed"),
 });
@@ -158,7 +163,14 @@ export function DocumentDetailPage() {
 
   useEffect(() => {
     if (detailData?.recipients && detailData.recipients.length > 0 && isDraft) {
-      form.reset({ recipients: detailData.recipients.map((r) => ({ teamName: r.teamName, email: r.email })) });
+      form.reset({
+        recipients: detailData.recipients.map((r) => ({
+          teamName: r.teamName,
+          email: r.email,
+          requiresReview: (r as { requiresReview?: boolean }).requiresReview ?? false,
+          requiresSignature: (r as { requiresSignature?: boolean }).requiresSignature ?? true,
+        })),
+      });
     }
   }, [detailData, isDraft, form]);
 
@@ -283,7 +295,17 @@ export function DocumentDetailPage() {
 
   const onSaveRecipients = (values: z.infer<typeof recipientsSchema>) => {
     setRecipientsMutation.mutate(
-      { id, data: values },
+      {
+        id,
+        data: {
+          recipients: values.recipients.map((r) => ({
+            teamName: r.teamName,
+            email: r.email,
+            requiresReview: r.requiresReview ?? false,
+            requiresSignature: r.requiresSignature ?? true,
+          })),
+        },
+      },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetDocumentQueryKey(id) });
@@ -785,6 +807,26 @@ export function DocumentDetailPage() {
                                 </FormItem>
                               )}
                             />
+                            <div className="flex gap-3 pt-1">
+                              <label className="flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  className="h-3.5 w-3.5 rounded border-gray-300 text-primary"
+                                  checked={form.watch(`recipients.${index}.requiresReview`) ?? false}
+                                  onChange={(e) => form.setValue(`recipients.${index}.requiresReview`, e.target.checked)}
+                                />
+                                <span className="text-xs text-muted-foreground">Reviewer</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  className="h-3.5 w-3.5 rounded border-gray-300 text-primary"
+                                  checked={form.watch(`recipients.${index}.requiresSignature`) ?? true}
+                                  onChange={(e) => form.setValue(`recipients.${index}.requiresSignature`, e.target.checked)}
+                                />
+                                <span className="text-xs text-muted-foreground">Signer</span>
+                              </label>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -793,7 +835,7 @@ export function DocumentDetailPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => append({ teamName: "", email: "" })}
+                          onClick={() => append({ teamName: "", email: "", requiresReview: false, requiresSignature: true })}
                           disabled={formFields.length >= 20}
                         >
                           <Plus className="mr-1 h-3.5 w-3.5" />
@@ -903,11 +945,93 @@ export function DocumentDetailPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Activity Log */}
+              <ActivityLog documentId={id} />
             </>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+interface ActivityEvent {
+  id: string;
+  eventType: string;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  createdAt: string;
+  metadata?: unknown;
+}
+
+function ActivityLog({ documentId }: { documentId: string }) {
+  const { data, isLoading } = useQuery<{ events: ActivityEvent[] }>({
+    queryKey: ["document-activity", documentId],
+    queryFn: async () => {
+      const res = await fetch(`/api/documents/${documentId}/activity`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load activity");
+      return res.json();
+    },
+    refetchInterval: 10000,
+  });
+
+  const events = data?.events ?? [];
+
+  function eventIcon(type: string) {
+    switch (type) {
+      case "review_approved": return <ShieldCheck className="h-3.5 w-3.5 text-green-500 shrink-0" />;
+      case "review_changes_requested": return <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
+      case "signed": return <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />;
+      case "completed": return <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />;
+      case "sealed": return <ShieldCheck className="h-3.5 w-3.5 text-slate-500 shrink-0" />;
+      default: return <Activity className="h-3.5 w-3.5 text-muted-foreground shrink-0" />;
+    }
+  }
+
+  function eventLabel(type: string) {
+    switch (type) {
+      case "sent_for_review": return "Sent for review";
+      case "review_approved": return "Approved";
+      case "review_changes_requested": return "Changes requested";
+      case "signed": return "Signed";
+      case "completed": return "Completed";
+      case "sealed": return "PDF sealed";
+      default: return type.replace(/_/g, " ");
+    }
+  }
+
+  if (isLoading || events.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Activity className="h-4 w-4" />
+          Activity Log
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {events.map((e) => (
+            <div key={e.id} className="flex items-start gap-2.5 text-sm">
+              <div className="mt-0.5">{eventIcon(e.eventType)}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium capitalize">{eventLabel(e.eventType)}</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {format(new Date(e.createdAt), "MMM d, h:mm a")}
+                  </span>
+                </div>
+                {e.actorName && e.actorName !== "System" && (
+                  <p className="text-xs text-muted-foreground truncate">{e.actorName}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -923,6 +1047,12 @@ function StatusBadge({ status }: { status: string }) {
       return (
         <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-transparent">
           <Send className="mr-1 h-3 w-3" /> Out for Signature
+        </Badge>
+      );
+    case "in_review":
+      return (
+        <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-transparent">
+          <Clock className="mr-1 h-3 w-3" /> In Review
         </Badge>
       );
     default:

@@ -10,6 +10,7 @@ import { useGetMe } from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
 import { AuthPage } from "@/pages/auth";
 import { SignPage } from "@/pages/sign";
+import { ReviewPage } from "@/pages/review";
 
 const DashboardPage = lazy(() => import("@/pages/dashboard").then((m) => ({ default: m.DashboardPage })));
 const UploadPage = lazy(() => import("@/pages/upload").then((m) => ({ default: m.UploadPage })));
@@ -86,6 +87,7 @@ function Router() {
       <Switch>
         <Route path="/auth" component={AuthPage} />
         <Route path="/sign/:token" component={SignPage} />
+        <Route path="/review/:token" component={ReviewPage} />
         <Route path="/">
           <ProtectedRoute component={DashboardPage} />
         </Route>

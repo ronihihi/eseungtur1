@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -16,6 +16,12 @@ export const recipientsTable = pgTable("recipients", {
   viewedAt: timestamp("viewed_at"),
   signedAt: timestamp("signed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  requiresReview: boolean("requires_review").notNull().default(false),
+  requiresSignature: boolean("requires_signature").notNull().default(true),
+  reviewStatus: text("review_status"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNote: text("review_note"),
+  reviewChecklist: jsonb("review_checklist"),
 });
 
 export const insertRecipientSchema = createInsertSchema(recipientsTable).omit({
@@ -25,6 +31,9 @@ export const insertRecipientSchema = createInsertSchema(recipientsTable).omit({
   signerName: true,
   ipAddress: true,
   signatureData: true,
+  reviewedAt: true,
+  reviewNote: true,
+  reviewChecklist: true,
 });
 export type InsertRecipient = z.infer<typeof insertRecipientSchema>;
 export type Recipient = typeof recipientsTable.$inferSelect;

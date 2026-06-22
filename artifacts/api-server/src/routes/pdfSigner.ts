@@ -55,6 +55,15 @@ export interface SignerRecord {
   ipAddress?: string | null;
 }
 
+export interface ReviewerRecord {
+  name: string;
+  email: string;
+  reviewedAt: Date;
+  ipAddress?: string | null;
+  decision: "approved" | "changes_requested";
+  note?: string | null;
+}
+
 export interface DocMeta {
   documentName: string;
   documentId: string;
@@ -282,6 +291,7 @@ async function addAuditPage(
   fontArabicBold: PDFFont,
   pageNum: number,
   totalPages: number,
+  reviewers?: ReviewerRecord[],
 ): Promise<void> {
   const page = pdfDoc.addPage([595.28, 841.89]);
   const pw = 595.28;
@@ -338,6 +348,47 @@ async function addAuditPage(
   kv("Certificate ID:", certId, brandBlue, true);
   kv("Completed:", fmtDateTime(doc.completedAt));
   y -= 8;
+
+  // ── Review Record (only if reviewers were involved) ─────────────────────────
+  if (reviewers && reviewers.length > 0) {
+    sectionLabel("REVIEW RECORD");
+    const rvColX = [margin, margin + 115, margin + 255, margin + 350, margin + 440];
+    const rvHeaders = ["REVIEWER NAME", "EMAIL ADDRESS", "REVIEWED AT (UTC)", "DECISION", "NOTE"];
+    const rowH = 18;
+
+    page.drawRectangle({ x: margin, y: y - rowH + 5, width: contentW, height: rowH, color: lightBlue });
+    rvHeaders.forEach((h, i) => {
+      page.drawText(h, { x: rvColX[i] + 3, y: y - 3, size: 6.8, font: fontBold, color: brandBlue });
+    });
+    y -= rowH;
+
+    for (const [i, rv] of reviewers.entries()) {
+      if (i % 2 === 1) {
+        page.drawRectangle({ x: margin, y: y - rowH + 5, width: contentW, height: rowH, color: rgb(0.97, 0.97, 0.97) });
+      }
+      const decisionText = rv.decision === "approved" ? "APPROVED" : "CHANGES REQUESTED";
+      const decisionColor = rv.decision === "approved" ? successGreen : rgb(0.75, 0.2, 0.1);
+      const cells = [
+        truncate(rv.name, 18),
+        truncate(rv.email, 24),
+        fmtDateTime(rv.reviewedAt),
+      ];
+      cells.forEach((c, ci) => {
+        const cellFont = selectFont(c, font, fontArabic);
+        page.drawText(c, { x: rvColX[ci] + 3, y: y - 3, size: 7.5, font: cellFont, color: darkText });
+      });
+      page.drawText(decisionText, { x: rvColX[3] + 3, y: y - 3, size: 7.5, font: fontBold, color: decisionColor });
+      if (rv.note) {
+        page.drawText(truncate(rv.note, 14), { x: rvColX[4] + 3, y: y - 3, size: 7.5, font, color: darkText });
+      }
+      y -= rowH;
+      page.drawLine({
+        start: { x: margin, y: y + 5 }, end: { x: pw - margin, y: y + 5 },
+        thickness: 0.3, color: lineGray,
+      });
+    }
+    y -= 12;
+  }
 
   // ── Signing Record ─────────────────────────────────────────────────────────
   sectionLabel("SIGNING RECORD");
@@ -421,7 +472,7 @@ async function addAuditPage(
 export async function buildSignedPdf(
   source: string | Buffer,
   entries: FieldEntry[],
-  meta?: { doc: DocMeta; signers: SignerRecord[] }
+  meta?: { doc: DocMeta; signers: SignerRecord[]; reviewers?: ReviewerRecord[] }
 ): Promise<Uint8Array> {
   const pdfBytes = Buffer.isBuffer(source) ? source : readFileSync(source);
   const pdfDoc = await PDFDocument.load(pdfBytes);
@@ -533,7 +584,7 @@ export async function buildSignedPdf(
     }
 
     // Audit certificate page at the end
-    await addAuditPage(pdfDoc, doc, signers, certId, docHash, font, fontBold, fontArabic, fontArabicBold, totalPages, totalPages);
+    await addAuditPage(pdfDoc, doc, signers, certId, docHash, font, fontBold, fontArabic, fontArabicBold, totalPages, totalPages, meta.reviewers);
   }
 
   return pdfDoc.save();

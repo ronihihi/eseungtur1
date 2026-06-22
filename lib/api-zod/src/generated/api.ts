@@ -215,6 +215,11 @@ export const SetRecipientsBody = zod.object({
       zod.object({
         teamName: zod.string(),
         email: zod.string().email(),
+        requiresReview: zod.boolean().optional(),
+        requiresSignature: zod.boolean().optional(),
+        reviewChecklist: zod
+          .array(zod.object({ label: zod.string() }))
+          .optional(),
       }),
     )
     .max(setRecipientsBodyRecipientsMax),

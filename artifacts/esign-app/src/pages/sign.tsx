@@ -435,6 +435,28 @@ export function SignPage() {
     );
   }
 
+  const nextStep = (data as { nextStep?: string }).nextStep;
+
+  if (nextStep === "blocked") {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-muted/30 p-4">
+        <Card className="w-full max-w-lg">
+          <CardContent className="pt-10 pb-10 flex flex-col items-center text-center gap-4">
+            <div className="h-16 w-16 rounded-full bg-amber-100 flex items-center justify-center">
+              <Clock className="h-8 w-8 text-amber-600" />
+            </div>
+            <h2 className="text-xl font-bold">Awaiting Review Approval</h2>
+            <p className="text-muted-foreground max-w-sm">
+              <strong>{data.documentTitle}</strong> is currently being reviewed.
+              You will receive an email once the document has been approved and is ready for your signature.
+            </p>
+            <p className="text-xs text-muted-foreground">Check your inbox for an update from the document owner.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[100dvh] flex flex-col bg-muted/30">
       <header className="bg-card border-b py-4 sticky top-0 z-10">

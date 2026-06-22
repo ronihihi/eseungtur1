@@ -1,0 +1,198 @@
+# Review-then-Sign — feature build brief (WorkflowSign)
+
+> **How to use:** paste everything below the divider into the Replit AI Agent on the WorkflowSign repo. It's written against your actual stack and file layout (from `INFRASTRUCTURE.md`), scoped as an MVP with a Phase 2 noted at the end. The agent should follow your existing patterns: `lib/api-spec/openapi.yaml` is the API source of truth (regenerate Orval hooks + Zod after editing it), Drizzle for schema, `drizzle-kit push` for migrations.
+
+---
+
+## Context (you are working on an existing app)
+
+WorkflowSign is a monorepo: Express 5 API in `artifacts/api-server`, React 19 / Vite SPA in `artifacts/esign-app`, Drizzle schema + migrations in `lib/db`, OpenAPI contract in `lib/api-spec/openapi.yaml`, generated TanStack hooks in `lib/api-client-react`, generated Zod in `lib/api-zod`. PostgreSQL 16 via `drizzle-orm`. PDFs built with `pdf-lib` in `pdfSigner.ts`. Email via `nodemailer` in `emailService.ts`. Today, recipients are emailed a unique `token` link and sign by drawing a signature; an "audit log" is assembled on the fly in `GET /api/admin/audit`.
+
+**Do not** change authentication, CORS, or session handling in this task — that hardening is tracked separately.
+
+## What we're building
+
+An optional **review** step before signing.
+
+A recipient can now be a **signer** (today's behaviour), a **reviewer** (approves via a checklist, no signature), or **both** (must review and accept, *then* sign). Reviewers act first; signers are only emailed once **all** reviewers have approved. Every action — opened, reviewed, approved, signed — is written to an **append-only activity log** with timestamp and IP. The reviewers' approvals and the signatures are visible to the document owner (full activity log) and to each recipient (a completion receipt), and both print on the final PDF's certificate page.
+
+## Behaviour contract (the rules that must hold)
+
+1. **Roles are flags, defaults preserve current behaviour.** Every recipient has `requiresReview` (default `false`) and `requiresSignature` (default `true`). Existing documents are untouched.
+2. **Review gates signing.** No signer receives their signing email until every recipient with `requiresReview = true` has `reviewStatus = 'approved'`.
+3. **Order is enforced per person.** For a recipient who is both (`requiresReview` and `requiresSignature` true), the signing endpoint must reject a signature until that recipient's own `reviewStatus = 'approved'`. Sequence can only ever be review → approve → sign.
+4. **Request-changes returns control.** If any reviewer chooses "request changes", the document moves to `changes_requested`, the owner is notified, and all signer links stay locked. Re-sending returns it to `in_review`.
+5. **Reviewers don't get fields.** A `requiresSignature = false` recipient cannot have `signature_fields` and must not appear in the field-placement selector.
+6. **Everything is logged, append-only.** Each meaningful action inserts one `document_events` row. Rows are never updated or deleted.
+7. **The finished artifact is sealed.** On completion, render the signed PDF once, store it, and record its hash (see §3.5). Serve the stored file thereafter.
+
+---
+
+## 1. Data model (`lib/db/src/schema`)
+
+### 1a. Extend `recipients`
+
+```ts
+requiresReview:    boolean("requires_review").notNull().default(false),
+requiresSignature: boolean("requires_signature").notNull().default(true),
+reviewStatus:      text("review_status"),        // null | 'pending' | 'approved' | 'changes_requested'
+reviewedAt:        timestamp("reviewed_at"),
+reviewNote:        text("review_note"),
+reviewChecklist:   jsonb("review_checklist"),     // [{ "label": string, "checked": boolean }]
+```
+
+Reuse the existing `teamName` column as the reviewer's **function label** ("Finance", "Legal", "Programs"). Keep all existing signing fields (`status`, `signedAt`, `signerName`, `signatureData`, `ipAddress`); for a recipient who is both, these get populated after the review is approved.
+
+`reviewStatus` semantics: `null` when `requiresReview = false`; set to `'pending'` when the recipient is created as a reviewer; `'approved'` / `'changes_requested'` after they act.
+
+### 1b. Extend `documents.status`
+
+It's a `text` column, so no migration is needed for new values — only code. Allowed values become:
+
+`'draft' | 'in_review' | 'sent' | 'changes_requested' | 'completed'`
+
+### 1c. New table `document_events` (append-only)
+
+```ts
+export const documentEvents = pgTable("document_events", {
+  id:          text("id").primaryKey(),                                  // uuid v4
+  documentId:  text("document_id").notNull().references(() => documents.id),
+  recipientId: text("recipient_id").references(() => recipients.id),     // nullable (owner/system events)
+  eventType:   text("event_type").notNull(),                             // see §6
+  actorName:   text("actor_name"),
+  actorEmail:  text("actor_email"),
+  metadata:    jsonb("metadata"),                                        // checklist summary, note, doc hash, etc.
+  ipAddress:   text("ip_address"),
+  userAgent:   text("user_agent"),
+  createdAt:   timestamp("created_at").notNull().defaultNow(),
+});
+```
+
+Insert-only. There must be no `UPDATE` or `DELETE` against this table anywhere in the codebase.
+
+Apply with `pnpm --filter @workspace/db run push`.
+
+---
+
+## 2. API contract (`lib/api-spec/openapi.yaml` first, then regenerate Orval)
+
+### Modified
+
+- `POST /api/documents/:id/recipients` — each recipient object also accepts `requiresReview: boolean`, `requiresSignature: boolean`, and optional `reviewChecklist: { label: string }[]` (the template the reviewer will confirm).
+- `GET /api/sign/:token` — response gains `requiresReview`, `requiresSignature`, `reviewStatus`, `status`, `reviewChecklist`, and a derived `nextStep: 'review' | 'sign' | 'done' | 'blocked'` so the SPA knows which screen to render.
+
+### New
+
+- `POST /api/sign/:token/review` — submit a review. Body:
+  ```ts
+  z.object({
+    decision: z.enum(["approve", "request_changes"]),
+    checklist: z.array(z.object({ label: z.string(), checked: z.boolean() })),
+    note: z.string().max(2000).optional(),
+  })
+  ```
+- `GET /api/documents/:id/activity` — returns the ordered `document_events` for the owner's activity log. (Owner-only, same auth guard as the document detail route.)
+
+Keep `POST /api/sign/:token` (signature submission) but add the guards in §3.2.
+
+---
+
+## 3. Backend (`artifacts/api-server/src`)
+
+### 3.1 `routes/recipients.ts`
+Persist `requiresReview` / `requiresSignature` and, for reviewers, store the `reviewChecklist` template and set `reviewStatus = 'pending'`. On `POST .../send`: if the document has any reviewers, set `documents.status = 'in_review'` and email **reviewers only**; otherwise behave as today (`'sent'`, email signers). Write a `sent_for_review` (or `sent`) event.
+
+### 3.2 `routes/signing.ts`
+- **New `POST /api/sign/:token/review`**: validate body; load recipient by token; capture `ip = req.ip` and `req.headers["user-agent"]`. On `approve`: set `reviewStatus = 'approved'`, `reviewedAt = now()`, store `reviewNote` and `reviewChecklist`; insert a `reviewed` event with a checklist summary in `metadata`; then **evaluate the gate** (§3.3). On `request_changes`: set `reviewStatus = 'changes_requested'`, `documents.status = 'changes_requested'`, insert a `changes_requested` event, notify the owner; do **not** unlock signers.
+- **Guard `POST /api/sign/:token`** (signature): reject (`409`) if `recipient.requiresReview && recipient.reviewStatus !== 'approved'`. Reject if the recipient is a signer and the document-level gate hasn't cleared (`documents.status !== 'sent'`). On success, insert a `signed` event, then run the completion check (§3.4).
+- **`GET /api/sign/:token`**: compute and return `nextStep` (`review` if review pending; `sign` if review done/not required and signature pending and gate cleared; `blocked` if signature pending but gate not cleared; `done` otherwise). Insert an `opened` event on first view (keep the existing `viewed` behaviour).
+
+### 3.3 Gate evaluation (shared helper)
+After any approval: if **all** `requiresReview` recipients on the document are `'approved'`, set `documents.status = 'sent'`, insert a `sign_unlocked` event, and email every `requiresSignature` recipient their signing link (this also unlocks the sign step for any both-role recipient). The signer email includes the names/functions of the approving reviewers (see §3.6).
+
+### 3.4 Completion (shared helper)
+When every `requiresSignature` recipient is `'signed'`: set `documents.status = 'completed'`, `completedAt = now()`, run §3.5, insert a `completed` event.
+
+### 3.5 `lib/pdfSigner.ts` — certificate + sealing
+- Add a **"Reviewed by"** block to `addAuditPage`, rendered **above** the signatures: one line per reviewer with `teamName` (function), `signerName`/email, decision, timestamp, and IP — the same evidentiary fields you already show for signers.
+- **Seal once:** in the completion helper, call `buildSignedPdf` a single time, upload the result to Object Storage (reuse `uploadToGcs`), compute `sha256` of those final bytes, and store both the GCS path and the hash in the `completed` event's `metadata`. Change the download routes (`/api/documents/:id/download`, `/api/sign/:token/download`) to **return the stored file** when present, falling back to on-demand generation only for legacy documents. This makes the "Reviewed by + Signed" proof tamper-evident and is the companion fix to the regenerate-on-download issue noted in the infrastructure review.
+
+### 3.6 `lib/emailService.ts`
+Two templates, plus reuse on unlock:
+- **Review invite** (`requiresReview` recipients, sent at `in_review`): subject "Please review: {title}", a "Review document" button to `/review/:token`, makes clear no signature is needed.
+- **Sign invite** (`requiresSignature` recipients, sent on unlock): subject "Please sign: {title}", a "Review & sign" button to `/sign/:token`, and a line listing the reviewers who approved ("Reviewed and approved by Finance, Legal and Programs").
+- **Owner notifications**: "review complete" and "changes requested".
+
+---
+
+## 4. Frontend (`artifacts/esign-app/src`)
+
+- **Recipients setup card** — add a per-recipient role control matching the current design (a `Sign` / `Review` segmented choice; default `Sign`). Optionally a small checklist editor when `Review` is selected. Update the subtitle to "…who need to sign or review."
+- **Place Fields panel** — exclude `requiresSignature = false` recipients from the field-target selector (reviewers get no fields).
+- **Reviewer screen** (new route `/review/:token`, or a branch of the signing page driven by `nextStep`) — the existing `react-pdf` viewer (read-only) beside a checklist, an optional note box, an attestation line, and **Approve** / **Request changes** buttons. Posts to `POST /api/sign/:token/review`.
+- **Signing screen** — existing signature pad; show the "reviewed and approved by …" context; render only when `nextStep === 'sign'`. If a user lands on `/sign/:token` while review is still pending, redirect to `/review/:token`.
+- **Receipt screen** — after a recipient finishes their required steps, show the completed steps (Reviewed & approved, Signed) with timestamps and a "Download signed copy" button.
+- **Owner document detail / dashboard** — show per-recipient review status alongside signing status, and render the **activity log** from `GET /api/documents/:id/activity`.
+
+---
+
+## 5. Lifecycle (state machine)
+
+```
+draft
+  │  owner clicks Send
+  ▼
+in_review ──(a reviewer requests changes)──► changes_requested ──(owner re-sends)──► in_review
+  │  all reviewers approved  →  email signers
+  ▼
+sent
+  │  all required signatures collected  →  seal PDF
+  ▼
+completed
+```
+
+Per recipient: a reviewer goes `pending → approved` (or `changes_requested`); a signer goes `pending → viewed → signed`; a both-role recipient does the review track first, and their sign track only unlocks once their own review is `approved`.
+
+---
+
+## 6. Activity log — event types and captured fields
+
+Every row carries `documentId`, optional `recipientId`, `actorName`, `actorEmail`, `ipAddress`, `userAgent`, `createdAt`, and an event-specific `metadata`.
+
+| `eventType` | When | Notable `metadata` |
+|---|---|---|
+| `created` | Document uploaded | — |
+| `sent_for_review` | Sent, reviewers exist | reviewer count |
+| `opened` | Recipient first opens link | — |
+| `reviewed` | Reviewer approves | `{ confirmed: 4, total: 4, note }` |
+| `changes_requested` | Reviewer requests changes | `{ note }` |
+| `sign_unlocked` | All reviewers approved | — |
+| `signed` | Recipient signs | — |
+| `completed` | All signatures collected | `{ gcsPath, sha256 }` |
+
+This is the single source for the owner's activity log and the data behind each recipient's receipt.
+
+---
+
+## 7. Acceptance criteria (test before calling it done)
+
+- [ ] A `Review`-only recipient receives the review email, has **no** signature fields, can approve, and is never asked to sign.
+- [ ] A signer receives **no** signing email until every reviewer has approved.
+- [ ] A both-role recipient is **blocked** from signing until their own review is approved; the activity log shows their `reviewed` event before their `signed` event.
+- [ ] "Request changes" sets the document to `changes_requested`, notifies the owner, and keeps all signer links locked.
+- [ ] The activity log lists events in order, each with timestamp and IP; the owner sees the full log and each recipient sees their own approval + signature on the receipt.
+- [ ] The certificate page shows a "Reviewed by" block above the signatures.
+- [ ] The downloaded file after completion is the **stored** sealed PDF, and its hash matches the `completed` event.
+- [ ] A document with no reviewers behaves exactly as it does today.
+
+---
+
+## 8. Phasing
+
+**Phase 1 (this build):** role flags, review submission + gate, order enforcement, two email templates, `document_events` append-only log, the activity endpoint, reviewer/sign/receipt screens, recipients UI, the "Reviewed by" certificate block, and sealed-PDF storage. Checklist stored as JSON on the recipient.
+
+**Phase 2 (later, optional):** dedicated `review_items` / `review_responses` tables for cross-document reporting ("everything Finance flagged this quarter"); reusable per-document-type checklist templates; reviewer token expiry; configurable parallel-vs-ordered reviews. Keep reviews parallel and roles composable in Phase 1.
+
+---
+
+*Written against WorkflowSign as described in `INFRASTRUCTURE.md` (commit `6112f23`). The sealing step in §3.5 and the append-only log in §1c double as the audit-immutability fix flagged in the earlier security review.*

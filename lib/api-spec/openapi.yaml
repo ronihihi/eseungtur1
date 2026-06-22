@@ -370,6 +370,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/DocumentStatusResponse"
 
+  /documents/{id}/activity:
+    get:
+      operationId: getDocumentActivity
+      tags: [documents]
+      summary: Get the append-only activity log for a document (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Activity log events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityLogResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /recipients/{recipientId}/remind:
     post:
       operationId: remindRecipient
@@ -444,6 +469,49 @@ paths:
                 $ref: "#/components/schemas/SuccessResponse"
         "400":
           description: Already signed or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Review not yet approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sign/{token}/review:
+    post:
+      operationId: submitReview
+      tags: [signing]
+      summary: Submit a review decision for a recipient token
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitReviewRequest"
+      responses:
+        "200":
+          description: Review submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Invalid or already reviewed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Invalid token
           content:
             application/json:
               schema:
@@ -797,6 +865,17 @@ components:
       required:
         - fields
 
+    ReviewChecklistItem:
+      type: object
+      properties:
+        label:
+          type: string
+        checked:
+          type: boolean
+      required:
+        - label
+        - checked
+
     Recipient:
       type: object
       properties:
@@ -830,6 +909,25 @@ components:
           description: Base64-encoded signature image (present when signed)
         createdAt:
           type: string
+        requiresReview:
+          type: boolean
+        requiresSignature:
+          type: boolean
+        reviewStatus:
+          type: string
+          nullable: true
+          enum: [pending, approved, changes_requested]
+        reviewedAt:
+          type: string
+          nullable: true
+        reviewNote:
+          type: string
+          nullable: true
+        reviewChecklist:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/ReviewChecklistItem"
       required:
         - id
         - documentId
@@ -839,6 +937,8 @@ components:
         - status
         - token
         - createdAt
+        - requiresReview
+        - requiresSignature
 
     Document:
       type: object
@@ -854,7 +954,7 @@ components:
           enum: [sequential, simultaneous]
         status:
           type: string
-          enum: [draft, sent, completed]
+          enum: [draft, in_review, sent, changes_requested, completed]
         uploadedBy:
           type: string
         uploaderName:
@@ -927,6 +1027,21 @@ components:
         email:
           type: string
           format: email
+        requiresReview:
+          type: boolean
+          default: false
+        requiresSignature:
+          type: boolean
+          default: true
+        reviewChecklist:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+            required:
+              - label
       required:
         - teamName
         - email
@@ -995,6 +1110,24 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SignatureField"
+        nextStep:
+          type: string
+          enum: [review, sign, done, blocked]
+        approvedReviewers:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              teamName:
+                type: string
+              reviewedAt:
+                type: string
+            required:
+              - name
+              - teamName
+              - reviewedAt
       required:
         - recipient
         - documentTitle
@@ -1002,6 +1135,7 @@ components:
         - alreadySigned
         - documentStatus
         - fields
+        - nextStep
 
     SubmitSignatureRequest:
       type: object
@@ -1170,3 +1304,61 @@ components:
             $ref: "#/components/schemas/SigningRequest"
       required:
         - requests
+
+    SubmitReviewRequest:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum: [approve, request_changes]
+        checklist:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/ReviewChecklistItem"
+        note:
+          type: string
+          nullable: true
+      required:
+        - decision
+
+    ActivityEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        documentId:
+          type: string
+        recipientId:
+          type: string
+          nullable: true
+        eventType:
+          type: string
+        actorName:
+          type: string
+          nullable: true
+        actorEmail:
+          type: string
+          nullable: true
+        metadata:
+          nullable: true
+        ipAddress:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - documentId
+        - eventType
+        - createdAt
+
+    ActivityLogResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityEvent"
+      required:
+        - events

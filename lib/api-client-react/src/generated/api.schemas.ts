@@ -121,6 +121,20 @@ export const RecipientStatus = {
   signed: "signed",
 } as const;
 
+export type RecipientReviewStatus =
+  (typeof RecipientReviewStatus)[keyof typeof RecipientReviewStatus];
+
+export const RecipientReviewStatus = {
+  pending: "pending",
+  approved: "approved",
+  changes_requested: "changes_requested",
+} as const;
+
+export interface ReviewChecklistItem {
+  label: string;
+  checked: boolean;
+}
+
 export interface Recipient {
   id: string;
   documentId: string;
@@ -135,6 +149,12 @@ export interface Recipient {
   /** Base64-encoded signature image (present when signed) */
   signatureData?: string | null;
   createdAt: string;
+  requiresReview: boolean;
+  requiresSignature: boolean;
+  reviewStatus?: RecipientReviewStatus | null;
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
+  reviewChecklist?: ReviewChecklistItem[] | null;
 }
 
 export type DocumentSigningOrder =
@@ -150,7 +170,9 @@ export type DocumentStatus =
 
 export const DocumentStatus = {
   draft: "draft",
+  in_review: "in_review",
   sent: "sent",
+  changes_requested: "changes_requested",
   completed: "completed",
 } as const;
 
@@ -186,6 +208,9 @@ export interface DocumentDetailResponse {
 export interface RecipientInput {
   teamName: string;
   email: string;
+  requiresReview?: boolean;
+  requiresSignature?: boolean;
+  reviewChecklist?: Array<{ label: string }>;
 }
 
 export interface SetRecipientsRequest {
@@ -208,6 +233,16 @@ export interface DocumentStatusResponse {
   status: string;
 }
 
+export type SigningInfoResponseNextStep =
+  (typeof SigningInfoResponseNextStep)[keyof typeof SigningInfoResponseNextStep];
+
+export const SigningInfoResponseNextStep = {
+  review: "review",
+  sign: "sign",
+  done: "done",
+  blocked: "blocked",
+} as const;
+
 export interface SigningInfoResponse {
   recipient: Recipient;
   documentTitle: string;
@@ -216,6 +251,8 @@ export interface SigningInfoResponse {
   documentStatus: string;
   fields: SignatureField[];
   allSignedFields?: SignatureField[];
+  nextStep: SigningInfoResponseNextStep;
+  approvedReviewers?: Array<{ name: string; teamName: string; reviewedAt: string }>;
 }
 
 /**
@@ -353,3 +390,25 @@ export type UploadDocumentBody = {
   title?: string;
   signing_order?: UploadDocumentBodySigningOrder;
 };
+
+export interface SubmitReviewRequest {
+  decision: "approve" | "request_changes";
+  checklist?: ReviewChecklistItem[] | null;
+  note?: string | null;
+}
+
+export interface ActivityEvent {
+  id: string;
+  documentId: string;
+  recipientId?: string | null;
+  eventType: string;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  metadata?: unknown;
+  ipAddress?: string | null;
+  createdAt: string;
+}
+
+export interface ActivityLogResponse {
+  events: ActivityEvent[];
+}
