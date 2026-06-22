@@ -142,6 +142,10 @@ router.get("/signing/my-requests", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Not authenticated" });
     return;
   }
+  if (!req.session.emailVerified) {
+    res.json({ requests: [] });
+    return;
+  }
   try {
     const email = (req.session.userEmail ?? "").toLowerCase();
 
@@ -150,7 +154,6 @@ router.get("/signing/my-requests", async (req: Request, res: Response) => {
         id: recipientsTable.id,
         documentId: recipientsTable.documentId,
         status: recipientsTable.status,
-        token: recipientsTable.token,
         signedAt: recipientsTable.signedAt,
         teamName: recipientsTable.teamName,
       })
@@ -180,11 +183,11 @@ router.get("/signing/my-requests", async (req: Request, res: Response) => {
       .map((r) => {
         const doc = docMap.get(r.documentId);
         return {
+          recipientId: r.id,
           documentId: r.documentId,
           documentTitle: doc?.title ?? "Unknown Document",
           senderName: doc?.uploaderName ?? "Unknown",
           recipientStatus: r.status,
-          token: r.token,
           signedAt: r.signedAt?.toISOString() ?? null,
           sentAt: doc?.createdAt.toISOString() ?? null,
         };

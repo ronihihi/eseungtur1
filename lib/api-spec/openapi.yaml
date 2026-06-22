@@ -1271,6 +1271,8 @@ components:
     SigningRequest:
       type: object
       properties:
+        recipientId:
+          type: string
         documentId:
           type: string
         documentTitle:
@@ -1280,8 +1282,6 @@ components:
         recipientStatus:
           type: string
           enum: [pending, viewed, signed]
-        token:
-          type: string
         signedAt:
           type: string
           nullable: true
@@ -1289,11 +1289,11 @@ components:
           type: string
           nullable: true
       required:
+        - recipientId
         - documentId
         - documentTitle
         - senderName
         - recipientStatus
-        - token
 
     MySigningRequestsResponse:
       type: object

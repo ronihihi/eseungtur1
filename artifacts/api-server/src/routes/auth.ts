@@ -21,6 +21,7 @@ declare module "express-session" {
     userEmail: string;
     userRole: string;
     hasSavedSignature: boolean;
+    emailVerified: boolean;
     oauthState?: string;
   }
 }
@@ -45,7 +46,8 @@ router.post("/auth/register", authRateLimit, async (req: Request, res: Response)
       res.status(400).json({ error: "All fields are required and password must be at least 6 characters" });
       return;
     }
-    const { name, email, password } = parsed.data;
+    const { name, password } = parsed.data;
+    const email = parsed.data.email.toLowerCase();
 
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
     if (existing.length > 0) {
@@ -59,13 +61,14 @@ router.post("/auth/register", authRateLimit, async (req: Request, res: Response)
 
     const hashed = await bcrypt.hash(password, 10);
     const id = uuidv4();
-    await db.insert(usersTable).values({ id, name, email, password: hashed, role, provider: "local" });
+    await db.insert(usersTable).values({ id, name, email, password: hashed, role, provider: "local", emailVerified: false });
 
     req.session.userId = id;
     req.session.userName = name;
     req.session.userEmail = email;
     req.session.userRole = role;
     req.session.hasSavedSignature = false;
+    req.session.emailVerified = false;
 
     res.json({ success: true, user: { id, name, email, role, hasSavedSignature: false } });
   } catch (err) {
@@ -90,8 +93,13 @@ router.post("/auth/login", authRateLimit, async (req: Request, res: Response) =>
     }
     const user = users[0];
 
-    if (!user.password) {
+    if (user.provider !== "local") {
       res.status(401).json({ error: "This account uses Microsoft sign-in. Please use the 'Sign in with Microsoft' button." });
+      return;
+    }
+
+    if (!user.password) {
+      res.status(401).json({ error: "Invalid email or password" });
       return;
     }
 
@@ -106,6 +114,7 @@ router.post("/auth/login", authRateLimit, async (req: Request, res: Response) =>
     req.session.userEmail = user.email;
     req.session.userRole = user.role;
     req.session.hasSavedSignature = !!user.signatureData;
+    req.session.emailVerified = user.emailVerified ?? false;
 
     res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role, hasSavedSignature: !!user.signatureData } });
   } catch (err) {
@@ -235,21 +244,22 @@ router.get("/auth/azure/callback", async (req: Request, res: Response) => {
     const email = rawEmail.toLowerCase();
     const name = (idToken.name as string) || email;
 
-    // Find by azureId, then by email, or create new
+    // Find only by azureId — never auto-link by email to prevent pre-account takeover
     let users = await db.select().from(usersTable).where(eq(usersTable.azureId, azureId)).limit(1);
 
     if (users.length === 0) {
-      const byEmail = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+      // Refuse if another account already owns this email address.
+      // Without verified proof of prior ownership we must not silently merge identities.
+      const byEmail = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email)).limit(1);
       if (byEmail.length > 0) {
-        await db.update(usersTable).set({ azureId, provider: "azure" }).where(eq(usersTable.id, byEmail[0].id));
-        users = [{ ...byEmail[0], azureId, provider: "azure" }];
-      } else {
-        const firstUser = await db.select({ id: usersTable.id }).from(usersTable).limit(1);
-        const role = firstUser.length === 0 ? "admin" : "user";
-        const id = uuidv4();
-        await db.insert(usersTable).values({ id, name, email, role, provider: "azure", azureId });
-        users = [{ id, name, email, role, provider: "azure", azureId, password: null, signatureData: null, createdAt: new Date() }];
+        res.redirect("/auth?error=account_conflict");
+        return;
       }
+      const firstUser = await db.select({ id: usersTable.id }).from(usersTable).limit(1);
+      const role = firstUser.length === 0 ? "admin" : "user";
+      const id = uuidv4();
+      await db.insert(usersTable).values({ id, name, email, role, provider: "azure", azureId });
+      users = [{ id, name, email, role, provider: "azure", azureId, password: null, signatureData: null, emailVerified: true, createdAt: new Date() }];
     }
 
     const user = users[0];
@@ -258,6 +268,7 @@ router.get("/auth/azure/callback", async (req: Request, res: Response) => {
     req.session.userEmail = user.email;
     req.session.userRole = user.role;
     req.session.hasSavedSignature = !!user.signatureData;
+    req.session.emailVerified = true;
 
     res.redirect("/");
   } catch (err) {

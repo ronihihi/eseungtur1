@@ -428,11 +428,11 @@ export const SubmitSignatureResponse = zod.object({
 export const GetMySigningRequestsResponse = zod.object({
   requests: zod.array(
     zod.object({
+      recipientId: zod.string(),
       documentId: zod.string(),
       documentTitle: zod.string(),
       senderName: zod.string(),
       recipientStatus: zod.enum(["pending", "viewed", "signed"]),
-      token: zod.string(),
       signedAt: zod.string().nullish(),
       sentAt: zod.string().nullish(),
     }),

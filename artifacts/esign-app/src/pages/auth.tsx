@@ -61,6 +61,7 @@ export function AuthPage() {
         invalid_state: "Sign-in session expired. Please try again.",
         azure_failed: "Microsoft sign-in failed. Please try again.",
         access_denied: "Access was denied. Please contact your administrator.",
+        account_conflict: "An account with this email already exists. Please sign in with your password instead.",
       };
       toast({
         variant: "destructive",

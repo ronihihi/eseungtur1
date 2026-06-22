@@ -154,7 +154,7 @@ export function DashboardPage() {
                 const isPending = req.recipientStatus !== "signed";
                 return (
                   <div
-                    key={req.token}
+                    key={req.recipientId}
                     className={`rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-3 transition-colors ${
                       isPending
                         ? "border-orange-200 bg-orange-50/40 dark:border-orange-900/40 dark:bg-orange-950/10"
@@ -191,20 +191,8 @@ export function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-2 sm:ml-auto shrink-0">
                       <SigningStatusBadge status={req.recipientStatus} />
-                      {isPending ? (
-                        <Link href={`/sign/${req.token}`}>
-                          <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white gap-1.5 h-8">
-                            <PenLine className="h-3.5 w-3.5" />
-                            Sign Now
-                          </Button>
-                        </Link>
-                      ) : (
-                        <Link href={`/sign/${req.token}`}>
-                          <Button size="sm" variant="outline" className="gap-1.5 h-8">
-                            <Eye className="h-3.5 w-3.5" />
-                            View
-                          </Button>
-                        </Link>
+                      {isPending && (
+                        <span className="text-xs text-muted-foreground italic">Check your email for the signing link</span>
                       )}
                     </div>
                   </div>

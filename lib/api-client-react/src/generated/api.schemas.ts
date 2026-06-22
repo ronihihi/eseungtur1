@@ -367,11 +367,11 @@ export const SigningRequestRecipientStatus = {
 } as const;
 
 export interface SigningRequest {
+  recipientId: string;
   documentId: string;
   documentTitle: string;
   senderName: string;
   recipientStatus: SigningRequestRecipientStatus;
-  token: string;
   signedAt?: string | null;
   sentAt?: string | null;
 }
