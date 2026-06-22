@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { v4 as uuidv4 } from "uuid";
+import multer from "multer";
 import { eq, and } from "drizzle-orm";
 import { db, documentsTable, recipientsTable, signatureFieldsTable } from "@workspace/db";
 import type { Request, Response } from "express";
@@ -113,41 +114,36 @@ router.get("/documents", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.post("/documents", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { fileData, fileName, title, signing_order } = req.body as {
-      fileData?: string;
-      fileName?: string;
-      title?: string;
-      signing_order?: string;
-    };
+const multerUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter(_req, file, cb) {
+    const allowed = [".pdf", ".docx", ".doc"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) cb(null, true);
+    else cb(new Error("Only PDF and Word documents are allowed"));
+  },
+});
 
-    if (!fileData || !fileName) {
+router.post("/documents", requireAuth, multerUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const uploadedFile = req.file;
+    const { title, signing_order } = req.body as { title?: string; signing_order?: string };
+
+    if (!uploadedFile) {
       res.status(400).json({ error: "No file uploaded" });
       return;
     }
 
-    const allowed = [".pdf", ".docx", ".doc"];
+    const fileName = uploadedFile.originalname;
     const ext = path.extname(fileName).toLowerCase();
-    if (!allowed.includes(ext)) {
-      res.status(400).json({ error: "Only PDF and Word documents are allowed" });
-      return;
-    }
-
-    const buffer = Buffer.from(fileData, "base64");
-    if (buffer.length > 50 * 1024 * 1024) {
-      res.status(413).json({ error: "File exceeds the 50 MB limit" });
-      return;
-    }
-
-    let pdfBuffer: Buffer;
+    let pdfBuffer: Buffer = uploadedFile.buffer;
     let finalFilename = fileName;
 
     if (ext === ".docx" || ext === ".doc") {
-      // Write to temp dir, convert, read back, delete temp files
       const tmpDir = os.tmpdir();
       const tmpInput = path.join(tmpDir, `upload-${uuidv4()}${ext}`);
-      fs.writeFileSync(tmpInput, buffer);
+      fs.writeFileSync(tmpInput, pdfBuffer);
       try {
         const pdfPath = await convertDocxToPdf(tmpInput, tmpDir);
         pdfBuffer = fs.readFileSync(pdfPath);
@@ -161,11 +157,9 @@ router.post("/documents", requireAuth, async (req: Request, res: Response) => {
       } finally {
         fs.rmSync(tmpInput, { force: true });
       }
-    } else {
-      pdfBuffer = buffer;
     }
 
-    // Upload to GCS
+    // Upload to GCS and save record in parallel prep (GCS upload first, then DB)
     const objectName = `documents/${uuidv4()}.pdf`;
     const gcsPath = await uploadToGcs(pdfBuffer, objectName, "application/pdf");
 

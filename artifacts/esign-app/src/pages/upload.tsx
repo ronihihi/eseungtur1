@@ -114,62 +114,44 @@ export function UploadPage() {
     }
 
     setIsUploading(true);
-    setUploadProgress(10);
+    setUploadProgress(0);
 
     try {
-      const readFileAsBase64 = (f: File): Promise<string> =>
-        new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const ab = reader.result as ArrayBuffer;
-            const bytes = new Uint8Array(ab);
-            let binary = "";
-            const chunk = 8192;
-            for (let i = 0; i < bytes.length; i += chunk) {
-              binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-            }
-            resolve(btoa(binary));
-          };
-          reader.onerror = () => reject(reader.error);
-          reader.readAsArrayBuffer(f);
-        });
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("title", values.title);
+      formData.append("signing_order", values.signing_order);
 
-      let fileData: string;
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
-        let binary = "";
-        const chunk = 8192;
-        for (let i = 0; i < bytes.length; i += chunk) {
-          binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-        }
-        fileData = btoa(binary);
-      } catch {
-        fileData = await readFileAsBase64(file);
-      }
+      const data = await new Promise<{ documentId?: string; error?: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/documents");
+        xhr.withCredentials = true;
 
-      setUploadProgress(40);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            // Upload transfer: 0–80%; server processing (GCS+DB): 80–100%
+            setUploadProgress(Math.round((e.loaded / e.total) * 80));
+          }
+        };
 
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileData,
-          fileName: file.name,
-          title: values.title,
-          signing_order: values.signing_order,
-        }),
+        xhr.onload = () => {
+          setUploadProgress(95);
+          try {
+            resolve(JSON.parse(xhr.responseText) as { documentId?: string; error?: string });
+          } catch {
+            reject(new Error(`Upload failed (${xhr.status})`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("Network error — check your connection."));
+        xhr.ontimeout = () => reject(new Error("Upload timed out."));
+        xhr.timeout = 5 * 60 * 1000; // 5 min for large files + LibreOffice conversion
+
+        xhr.send(formData);
       });
 
-      setUploadProgress(90);
-
-      const data = await res.json() as { documentId?: string; error?: string };
-
-      if (!res.ok) {
-        if (res.status === 401) throw new Error("Session expired — please log in again.");
-        if (res.status === 413) throw new Error("File is too large. Please upload a file under 50 MB.");
-        throw new Error(data.error || `Upload failed (${res.status})`);
+      if (data.error) {
+        throw new Error(data.error);
       }
 
       setUploadProgress(100);
