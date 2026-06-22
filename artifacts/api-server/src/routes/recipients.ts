@@ -214,4 +214,69 @@ router.post("/recipients/:recipientId/remind", requireAuth, async (req: Request,
   }
 });
 
+router.post("/documents/:id/remind-all", requireAuth, async (req: Request, res: Response) => {
+  const documentId = req.params.id as string;
+  try {
+    const docs = await db
+      .select()
+      .from(documentsTable)
+      .where(and(eq(documentsTable.id, documentId), eq(documentsTable.uploadedBy, req.session.userId!)))
+      .limit(1);
+    if (docs.length === 0) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
+    const doc = docs[0];
+    const baseUrl = getAppBaseUrl(req);
+
+    const allRecipients = await db
+      .select()
+      .from(recipientsTable)
+      .where(eq(recipientsTable.documentId, documentId));
+
+    const reviewers = allRecipients.filter((x) => x.requiresReview);
+    const gateOpen = reviewers.every((x) => x.reviewStatus === "approved");
+    const approvedNames = reviewers.filter((x) => x.reviewStatus === "approved").map((x) => x.signerName || x.teamName);
+
+    let sent = 0;
+    const errors: string[] = [];
+
+    for (const r of allRecipients) {
+      const alreadyDone =
+        r.status === "signed" &&
+        (!r.requiresReview || r.reviewStatus === "approved" || r.reviewStatus === "changes_requested");
+      if (alreadyDone) continue;
+
+      try {
+        if (r.requiresReview && (r.reviewStatus === null || r.reviewStatus === "pending")) {
+          await sendReviewInviteEmail(r, doc, `${baseUrl}/review/${r.token}`, req.session.userName);
+          sent++;
+        } else if (r.requiresSignature && r.status !== "signed") {
+          if (!gateOpen) continue; // skip silently — gate not open yet
+          await sendSignUnlockEmail(r, doc, `${baseUrl}/sign/${r.token}`, approvedNames);
+          sent++;
+        } else if (!r.requiresReview && !r.requiresSignature) {
+          continue;
+        } else {
+          await sendSigningEmail(
+            r, doc, `${baseUrl}/sign/${r.token}`,
+            `Reminder: Please sign "${doc.title}"`,
+            "This is a reminder that your signature is required on this document.",
+            req.session.userName
+          );
+          sent++;
+        }
+      } catch (e) {
+        errors.push(r.email);
+        req.log.warn({ err: e, recipientId: r.id }, "remind-all: failed to send to one recipient");
+      }
+    }
+
+    res.json({ success: true, sent, errors });
+  } catch (err) {
+    req.log.error({ err }, "remind-all error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

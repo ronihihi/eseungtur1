@@ -48,7 +48,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 
 const RECIPIENT_COLORS = [
   { bg: "rgba(59,130,246,0.15)",  border: "#3b82f6", text: "#1d4ed8" },
@@ -137,6 +137,31 @@ export function DocumentDetailPage() {
   const setRecipientsMutation = useSetRecipients();
   const sendDocumentMutation = useSendDocument();
   const remindMutation = useRemindRecipient();
+
+  const remindAllMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/documents/${id}/remind-all`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "Failed to send reminders");
+      }
+      return res.json() as Promise<{ sent: number; errors: string[] }>;
+    },
+    onSuccess: (data) => {
+      if (data.sent === 0) {
+        toast({ title: "No reminders sent", description: "All recipients have already completed their action." });
+      } else {
+        toast({
+          title: `Reminder${data.sent !== 1 ? "s" : ""} sent`,
+          description: `Notified ${data.sent} recipient${data.sent !== 1 ? "s" : ""}${data.errors.length > 0 ? ` (${data.errors.length} failed)` : ""}.`,
+        });
+      }
+    },
+    onError: (err: Error) => toast({ variant: "destructive", title: "Failed to send reminders", description: err.message }),
+  });
   const saveFieldsMutation = useSaveDocumentFields();
 
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
@@ -888,7 +913,21 @@ export function DocumentDetailPage() {
 
               {/* Recipients Status */}
               <Card>
-                <CardHeader><CardTitle className="text-base">Signers</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                  <CardTitle className="text-base">Signers</CardTitle>
+                  {recipients.some((r) => r.status !== "signed") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1.5"
+                      onClick={() => remindAllMutation.mutate()}
+                      disabled={remindAllMutation.isPending}
+                    >
+                      <BellRing className="h-3 w-3" />
+                      {remindAllMutation.isPending ? "Sending…" : "Remind All"}
+                    </Button>
+                  )}
+                </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {recipients.map((recipient, idx) => (
