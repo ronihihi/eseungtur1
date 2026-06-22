@@ -3,7 +3,7 @@ import { useParams, Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { FileSignature, CheckCircle2, AlertCircle, Stamp, FileText, Download, PenLine, CalendarDays, Type, Clock } from "lucide-react";
+import { FileSignature, CheckCircle2, AlertCircle, Stamp, FileText, Download, PenLine, CalendarDays, Type, Clock, XCircle, MessageSquare } from "lucide-react";
 
 import {
   useGetSigningInfo,
@@ -441,6 +441,43 @@ export function SignPage() {
   const nextStep = (data as { nextStep?: string }).nextStep;
 
   if (nextStep === "blocked") {
+    const reviewRejected = (data as { reviewRejected?: boolean }).reviewRejected;
+    const rejectedReviewers = (data as { rejectedReviewers?: Array<{ name: string; note?: string | null; reviewedAt?: string | null }> }).rejectedReviewers ?? [];
+
+    if (reviewRejected) {
+      return (
+        <div className="min-h-[100dvh] flex items-center justify-center bg-muted/30 p-4">
+          <Card className="w-full max-w-lg">
+            <CardContent className="pt-10 pb-8 flex flex-col items-center text-center gap-4">
+              <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center">
+                <XCircle className="h-8 w-8 text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Document Returned for Changes</h2>
+                <p className="text-muted-foreground mt-2 max-w-sm">
+                  A reviewer has requested changes to <strong>{data.documentTitle}</strong> before it can proceed to signing.
+                </p>
+              </div>
+              {rejectedReviewers.length > 0 && (
+                <div className="w-full space-y-2 text-left">
+                  {rejectedReviewers.map((r, i) => (
+                    <div key={i} className="rounded-lg border border-orange-200 bg-orange-50 p-3 flex gap-2.5">
+                      <MessageSquare className="h-4 w-4 shrink-0 mt-0.5 text-orange-500" />
+                      <div>
+                        <p className="text-sm font-semibold text-orange-900">{r.name}</p>
+                        {r.note && <p className="text-sm text-orange-800 mt-0.5 whitespace-pre-wrap">{r.note}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">The document owner has been notified. You will receive an email if this document is resent.</p>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-[100dvh] flex items-center justify-center bg-muted/30 p-4">
         <Card className="w-full max-w-lg">

@@ -258,6 +258,15 @@ router.get("/sign/:token", async (req: Request, res: Response) => {
         note: x.reviewNote ?? null,
       }));
 
+    const rejectedReviewers = allRecipients
+      .filter((x) => x.requiresReview && x.reviewStatus === "changes_requested")
+      .map((x) => ({
+        name: x.signerName || x.teamName,
+        teamName: x.teamName,
+        reviewedAt: x.reviewedAt?.toISOString() ?? null,
+        note: x.reviewNote ?? null,
+      }));
+
     res.json({
       recipient: r,
       documentTitle: doc?.title ?? "Unknown Document",
@@ -268,6 +277,8 @@ router.get("/sign/:token", async (req: Request, res: Response) => {
       allSignedFields,
       nextStep,
       approvedReviewers,
+      reviewRejected: rejectedReviewers.length > 0,
+      rejectedReviewers,
     });
   } catch (err) {
     req.log.error({ err }, "get signing info error");

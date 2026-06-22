@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import {
   ArrowLeft, Send, Plus, Trash2, Mail, CheckCircle2,
   Clock, BellRing, Copy, Check, Save, FileText, Download,
-  PenLine, Pen, CalendarDays, Type, Grip, ShieldCheck, Activity, MessageSquare,
+  PenLine, Pen, CalendarDays, Type, Grip, ShieldCheck, ShieldX, Activity, MessageSquare,
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
@@ -960,7 +960,19 @@ export function DocumentDetailPage() {
                             <div className="flex-1 min-w-0 space-y-0.5">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-sm font-semibold">{recipient.teamName}</span>
-                                <RecipientStatusBadge status={recipient.status} />
+                                {rExt.reviewStatus === "approved" && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">
+                                    <ShieldCheck className="h-2.5 w-2.5" /> Approved
+                                  </span>
+                                )}
+                                {rExt.reviewStatus === "changes_requested" && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-orange-50 text-orange-700 border border-orange-200">
+                                    <ShieldX className="h-2.5 w-2.5" /> Changes requested
+                                  </span>
+                                )}
+                                {!(rExt.reviewStatus === "approved" || rExt.reviewStatus === "changes_requested") && (
+                                  <RecipientStatusBadge status={recipient.status} />
+                                )}
                               </div>
                               <div className="text-xs text-muted-foreground flex items-center gap-1 truncate">
                                 <Mail className="h-3 w-3 shrink-0" />
