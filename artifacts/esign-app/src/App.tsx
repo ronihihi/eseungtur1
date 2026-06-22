@@ -81,6 +81,28 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
   );
 }
 
+function AuditRoute({ component: Component }: { component: React.ComponentType }) {
+  const { data: me, isLoading } = useGetMe();
+  const [location] = useLocation();
+
+  if (isLoading) return <LoadingScreen />;
+
+  if (!me?.user) {
+    const redirect = encodeURIComponent(location);
+    return <Redirect to={`/auth?redirect=${redirect}`} />;
+  }
+
+  if (me.user.role !== "admin" && me.user.role !== "auditor") {
+    return <Redirect to="/" />;
+  }
+
+  return (
+    <Layout>
+      <Component />
+    </Layout>
+  );
+}
+
 function Router() {
   return (
     <Suspense fallback={<LoadingScreen />}>
@@ -101,7 +123,7 @@ function Router() {
           <AdminRoute component={AdminUsersPage} />
         </Route>
         <Route path="/admin/audit">
-          <AdminRoute component={AdminAuditPage} />
+          <AuditRoute component={AdminAuditPage} />
         </Route>
         <Route component={NotFound} />
       </Switch>

@@ -52,6 +52,7 @@ export function Layout({ children }: LayoutProps) {
     : "U";
 
   const isAdmin = me?.user?.role === "admin";
+  const canSeeAudit = me?.user?.role === "admin" || me?.user?.role === "auditor";
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
@@ -69,7 +70,7 @@ export function Layout({ children }: LayoutProps) {
             {isAdmin && (
               <NavLink href="/admin/users" icon={Users} label="Users" active={location === "/admin/users"} />
             )}
-            {isAdmin && (
+            {canSeeAudit && (
               <NavLink href="/admin/audit" icon={ClipboardList} label="Audit Log" active={location === "/admin/audit"} />
             )}
           </nav>

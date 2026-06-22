@@ -15,6 +15,17 @@ function requireAdmin(req: Request, res: Response, next: () => void) {
   next();
 }
 
+function requireAuditAccess(req: Request, res: Response, next: () => void) {
+  const role = req.session.userRole;
+  if (!req.session.userId || (role !== "admin" && role !== "auditor")) {
+    res.status(403).json({ error: "Audit access required" });
+    return;
+  }
+  next();
+}
+
+// ── User management (admin only) ─────────────────────────────────────────────
+
 router.get("/admin/users", requireAdmin, async (req: Request, res: Response) => {
   try {
     const users = await db
@@ -50,12 +61,13 @@ router.post("/admin/users", requireAdmin, async (req: Request, res: Response) =>
     }
     const hashed = await bcrypt.hash(password, 10);
     const id = uuidv4();
+    const validRole = (role === "admin" || role === "auditor") ? role : "user";
     await db.insert(usersTable).values({
       id,
       name,
       email: normalizedEmail,
       password: hashed,
-      role: role === "admin" ? "admin" : "user",
+      role: validRole,
       provider: "local",
     });
     res.json({ success: true });
@@ -83,8 +95,8 @@ router.delete("/admin/users/:id", requireAdmin, async (req: Request, res: Respon
 router.patch("/admin/users/:id/role", requireAdmin, async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const { role } = req.body as { role?: string };
-  if (role !== "admin" && role !== "user") {
-    res.status(400).json({ error: "role must be 'admin' or 'user'" });
+  if (role !== "admin" && role !== "user" && role !== "auditor") {
+    res.status(400).json({ error: "role must be 'admin', 'auditor', or 'user'" });
     return;
   }
   if (id === req.session.userId && role !== "admin") {
@@ -100,123 +112,205 @@ router.patch("/admin/users/:id/role", requireAdmin, async (req: Request, res: Re
   }
 });
 
-router.get("/admin/audit", requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const documents = await db
-      .select({
-        id: documentsTable.id,
-        title: documentsTable.title,
-        uploaderName: documentsTable.uploaderName,
-        status: documentsTable.status,
-        createdAt: documentsTable.createdAt,
-        completedAt: documentsTable.completedAt,
-      })
-      .from(documentsTable)
-      .orderBy(desc(documentsTable.createdAt))
-      .limit(500);
+// ── Shared audit helpers ──────────────────────────────────────────────────────
 
-    const recipients = await db
-      .select({
-        id: recipientsTable.id,
-        documentId: recipientsTable.documentId,
-        teamName: recipientsTable.teamName,
-        email: recipientsTable.email,
-        signerName: recipientsTable.signerName,
-        ipAddress: recipientsTable.ipAddress,
-        viewedAt: recipientsTable.viewedAt,
-        signedAt: recipientsTable.signedAt,
-      })
-      .from(recipientsTable);
+type AuditEvent = {
+  id: string;
+  type: string;
+  documentId: string;
+  documentTitle: string;
+  uploaderName: string;
+  uploaderEmail: string | null;
+  actorName: string | null;
+  actorEmail: string | null;
+  ipAddress: string | null;
+  timestamp: string;
+  note?: string | null;
+};
 
-    const docTitleMap = new Map(documents.map(d => [d.id, d.title]));
+async function buildAuditEvents(): Promise<AuditEvent[]> {
+  const documents = await db
+    .select({
+      id: documentsTable.id,
+      title: documentsTable.title,
+      uploaderName: documentsTable.uploaderName,
+      uploadedBy: documentsTable.uploadedBy,
+      status: documentsTable.status,
+      createdAt: documentsTable.createdAt,
+      completedAt: documentsTable.completedAt,
+      uploaderEmail: usersTable.email,
+    })
+    .from(documentsTable)
+    .leftJoin(usersTable, eq(documentsTable.uploadedBy, usersTable.id))
+    .orderBy(desc(documentsTable.createdAt))
+    .limit(500);
 
-    type AuditEvent = {
-      id: string;
-      type: string;
-      documentId: string;
-      documentTitle: string;
-      actorName: string | null;
-      actorEmail: string | null;
-      ipAddress: string | null;
-      timestamp: string;
-    };
+  const recipients = await db
+    .select({
+      id: recipientsTable.id,
+      documentId: recipientsTable.documentId,
+      teamName: recipientsTable.teamName,
+      email: recipientsTable.email,
+      signerName: recipientsTable.signerName,
+      ipAddress: recipientsTable.ipAddress,
+      viewedAt: recipientsTable.viewedAt,
+      signedAt: recipientsTable.signedAt,
+      requiresReview: recipientsTable.requiresReview,
+      reviewStatus: recipientsTable.reviewStatus,
+      reviewedAt: recipientsTable.reviewedAt,
+      reviewNote: recipientsTable.reviewNote,
+    })
+    .from(recipientsTable);
 
-    const events: AuditEvent[] = [];
+  const docMap = new Map(documents.map(d => [d.id, d]));
 
-    for (const doc of documents) {
+  const events: AuditEvent[] = [];
+
+  for (const doc of documents) {
+    events.push({
+      id: `upload-${doc.id}`,
+      type: "uploaded",
+      documentId: doc.id,
+      documentTitle: doc.title,
+      uploaderName: doc.uploaderName,
+      uploaderEmail: doc.uploaderEmail ?? null,
+      actorName: doc.uploaderName,
+      actorEmail: doc.uploaderEmail ?? null,
+      ipAddress: null,
+      timestamp: doc.createdAt.toISOString(),
+    });
+
+    if (doc.status === "sent" || doc.status === "completed") {
       events.push({
-        id: `upload-${doc.id}`,
-        type: "uploaded",
+        id: `sent-${doc.id}`,
+        type: "sent",
         documentId: doc.id,
         documentTitle: doc.title,
+        uploaderName: doc.uploaderName,
+        uploaderEmail: doc.uploaderEmail ?? null,
         actorName: doc.uploaderName,
-        actorEmail: null,
+        actorEmail: doc.uploaderEmail ?? null,
         ipAddress: null,
         timestamp: doc.createdAt.toISOString(),
       });
-
-      if (doc.status === "sent" || doc.status === "completed") {
-        events.push({
-          id: `sent-${doc.id}`,
-          type: "sent",
-          documentId: doc.id,
-          documentTitle: doc.title,
-          actorName: doc.uploaderName,
-          actorEmail: null,
-          ipAddress: null,
-          // sent happens between upload and first view; use upload time as approximation
-          // but mark it distinctly so it doesn't collide
-          timestamp: doc.createdAt.toISOString(),
-        });
-      }
-
-      if (doc.completedAt) {
-        events.push({
-          id: `complete-${doc.id}`,
-          type: "completed",
-          documentId: doc.id,
-          documentTitle: doc.title,
-          actorName: null,
-          actorEmail: null,
-          ipAddress: null,
-          timestamp: doc.completedAt.toISOString(),
-        });
-      }
     }
 
-    for (const r of recipients) {
-      const docTitle = docTitleMap.get(r.documentId) ?? "Unknown Document";
-      if (r.viewedAt) {
-        events.push({
-          id: `view-${r.id}`,
-          type: "viewed",
-          documentId: r.documentId,
-          documentTitle: docTitle,
-          actorName: r.teamName,
-          actorEmail: r.email,
-          ipAddress: null,
-          timestamp: r.viewedAt.toISOString(),
-        });
-      }
-      if (r.signedAt) {
-        events.push({
-          id: `sign-${r.id}`,
-          type: "signed",
-          documentId: r.documentId,
-          documentTitle: docTitle,
-          actorName: r.signerName ?? r.teamName,
-          actorEmail: r.email,
-          ipAddress: r.ipAddress ?? null,
-          timestamp: r.signedAt.toISOString(),
-        });
-      }
+    if (doc.completedAt) {
+      events.push({
+        id: `complete-${doc.id}`,
+        type: "completed",
+        documentId: doc.id,
+        documentTitle: doc.title,
+        uploaderName: doc.uploaderName,
+        uploaderEmail: doc.uploaderEmail ?? null,
+        actorName: null,
+        actorEmail: null,
+        ipAddress: null,
+        timestamp: doc.completedAt.toISOString(),
+      });
+    }
+  }
+
+  for (const r of recipients) {
+    const doc = docMap.get(r.documentId);
+    const docTitle = doc?.title ?? "Unknown Document";
+    const uploaderName = doc?.uploaderName ?? "";
+    const uploaderEmail = doc?.uploaderEmail ?? null;
+
+    if (r.viewedAt) {
+      events.push({
+        id: `view-${r.id}`,
+        type: "viewed",
+        documentId: r.documentId,
+        documentTitle: docTitle,
+        uploaderName,
+        uploaderEmail,
+        actorName: r.teamName,
+        actorEmail: r.email,
+        ipAddress: null,
+        timestamp: r.viewedAt.toISOString(),
+      });
     }
 
-    events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    if (r.signedAt) {
+      events.push({
+        id: `sign-${r.id}`,
+        type: "signed",
+        documentId: r.documentId,
+        documentTitle: docTitle,
+        uploaderName,
+        uploaderEmail,
+        actorName: r.signerName ?? r.teamName,
+        actorEmail: r.email,
+        ipAddress: r.ipAddress ?? null,
+        timestamp: r.signedAt.toISOString(),
+      });
+    }
 
-    res.json({ events: events.slice(0, 1000) });
+    if (r.requiresReview && r.reviewedAt && r.reviewStatus) {
+      const eventType = r.reviewStatus === "approved" ? "review_approved" : "review_changes_requested";
+      events.push({
+        id: `review-${r.id}`,
+        type: eventType,
+        documentId: r.documentId,
+        documentTitle: docTitle,
+        uploaderName,
+        uploaderEmail,
+        actorName: r.signerName ?? r.teamName,
+        actorEmail: r.email,
+        ipAddress: r.ipAddress ?? null,
+        timestamp: r.reviewedAt.toISOString(),
+        note: r.reviewNote ?? null,
+      });
+    }
+  }
+
+  events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  return events.slice(0, 1000);
+}
+
+// ── Audit log (admin + auditor) ───────────────────────────────────────────────
+
+router.get("/admin/audit", requireAuditAccess, async (req: Request, res: Response) => {
+  try {
+    const events = await buildAuditEvents();
+    res.json({ events });
   } catch (err) {
     req.log.error({ err }, "audit log error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── CSV export (admin + auditor) ──────────────────────────────────────────────
+
+router.get("/admin/audit/export", requireAuditAccess, async (req: Request, res: Response) => {
+  try {
+    const events = await buildAuditEvents();
+
+    const escape = (s: string | null | undefined) => `"${(s ?? "").replace(/"/g, '""')}"`;
+
+    const headers = ["Event Type", "Document Title", "Document ID", "Uploaded By", "Uploader Email", "Actor Name", "Actor Email", "IP Address", "Timestamp (UTC)", "Note"];
+    const rows = events.map(e => [
+      e.type,
+      e.documentTitle,
+      e.documentId,
+      e.uploaderName,
+      e.uploaderEmail ?? "",
+      e.actorName ?? "",
+      e.actorEmail ?? "",
+      e.ipAddress ?? "",
+      new Date(e.timestamp).toISOString().replace("T", " ").slice(0, 19),
+      e.note ?? "",
+    ]);
+
+    const csv = [headers.map(escape).join(","), ...rows.map(r => r.map(escape).join(","))].join("\r\n");
+
+    const filename = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send("\uFEFF" + csv);
+  } catch (err) {
+    req.log.error({ err }, "audit export error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -49,7 +49,7 @@ const createUserSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["admin", "user"]).default("user"),
+  role: z.enum(["admin", "auditor", "user"]).default("user"),
 });
 
 function formatDate(iso: string) {
@@ -72,11 +72,9 @@ function ProviderBadge({ provider }: { provider: string }) {
 }
 
 function RoleBadge({ role }: { role: string }) {
-  return role === "admin" ? (
-    <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">Admin</Badge>
-  ) : (
-    <Badge variant="secondary">User</Badge>
-  );
+  if (role === "admin") return <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">Admin</Badge>;
+  if (role === "auditor") return <Badge className="bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-50">Auditor</Badge>;
+  return <Badge variant="secondary">User</Badge>;
 }
 
 export function AdminUsersPage() {
@@ -135,12 +133,14 @@ export function AdminUsersPage() {
   };
 
   const handleToggleRole = (user: AdminUser) => {
-    const newRole = user.role === "admin" ? "user" : "admin";
+    const roleMap: Record<string, string> = { admin: "user", auditor: "admin", user: "admin" };
+    const newRole = roleMap[user.role] ?? "user";
+    const roleLabel: Record<string, string> = { admin: "an Admin", auditor: "an Auditor", user: "a User" };
     roleMutation.mutate(
       { id: user.id, data: { role: newRole } },
       {
         onSuccess: () => {
-          toast({ title: `${user.name} is now ${newRole === "admin" ? "an Admin" : "a User"}` });
+          toast({ title: `${user.name} is now ${roleLabel[newRole] ?? newRole}` });
           void refetch();
         },
         onError: (err: unknown) => {
@@ -238,6 +238,7 @@ export function AdminUsersPage() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="user">User</SelectItem>
+                          <SelectItem value="auditor">Auditor</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>

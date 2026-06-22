@@ -6,24 +6,33 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { ClipboardList, Search, Upload, Send, Eye, PenLine, CheckCircle2, ExternalLink } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  ClipboardList, Search, Upload, Send, Eye, PenLine,
+  CheckCircle2, ExternalLink, RefreshCw, Download,
+  CheckCheck, XCircle, FileText, Users,
+} from "lucide-react";
 
 const EVENT_LABELS: Record<string, string> = {
   uploaded: "Uploaded",
-  sent: "Sent for signing",
+  sent: "Sent for Signing",
   viewed: "Viewed",
   signed: "Signed",
   completed: "Completed",
+  review_approved: "Review Approved",
+  review_changes_requested: "Changes Requested",
 };
 
 const EVENT_ICONS: Record<string, React.ReactNode> = {
-  uploaded: <Upload className="h-3.5 w-3.5" />,
-  sent: <Send className="h-3.5 w-3.5" />,
-  viewed: <Eye className="h-3.5 w-3.5" />,
-  signed: <PenLine className="h-3.5 w-3.5" />,
-  completed: <CheckCircle2 className="h-3.5 w-3.5" />,
+  uploaded: <Upload className="h-3 w-3" />,
+  sent: <Send className="h-3 w-3" />,
+  viewed: <Eye className="h-3 w-3" />,
+  signed: <PenLine className="h-3 w-3" />,
+  completed: <CheckCircle2 className="h-3 w-3" />,
+  review_approved: <CheckCheck className="h-3 w-3" />,
+  review_changes_requested: <XCircle className="h-3 w-3" />,
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -32,12 +41,21 @@ const EVENT_COLORS: Record<string, string> = {
   viewed: "bg-amber-50 text-amber-700 border-amber-200",
   signed: "bg-emerald-50 text-emerald-700 border-emerald-200",
   completed: "bg-green-50 text-green-700 border-green-200",
+  review_approved: "bg-teal-50 text-teal-700 border-teal-200",
+  review_changes_requested: "bg-orange-50 text-orange-700 border-orange-200",
+};
+
+const TAB_TYPES: Record<string, string[]> = {
+  all: [],
+  documents: ["uploaded", "sent", "completed"],
+  signing: ["viewed", "signed"],
+  review: ["review_approved", "review_changes_requested"],
 };
 
 function EventBadge({ type }: { type: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${EVENT_COLORS[type] ?? "bg-muted text-muted-foreground border-border"}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${EVENT_COLORS[type] ?? "bg-muted text-muted-foreground border-border"}`}
     >
       {EVENT_ICONS[type]}
       {EVENT_LABELS[type] ?? type}
@@ -68,72 +86,138 @@ function formatTimestamp(iso: string) {
   return { relative, absolute };
 }
 
-function AuditRow({ event }: { event: AuditEvent }) {
+type ExtendedAuditEvent = AuditEvent & {
+  uploaderName?: string;
+  uploaderEmail?: string | null;
+  note?: string | null;
+};
+
+function AuditRow({ event }: { event: ExtendedAuditEvent }) {
   const { relative, absolute } = formatTimestamp(event.timestamp);
 
   return (
-    <div className="flex items-start gap-4 px-4 py-3 hover:bg-muted/30 transition-colors border-b last:border-0">
-      <div className="w-36 shrink-0 pt-0.5">
+    <TableRow className="hover:bg-muted/30">
+      <TableCell className="py-2.5">
         <EventBadge type={event.type} />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 text-sm font-medium text-foreground truncate">
-          <Link
-            href={`/documents/${event.documentId}`}
-            className="hover:text-primary hover:underline truncate flex items-center gap-1"
-          >
-            {event.documentTitle}
-            <ExternalLink className="h-3 w-3 shrink-0 opacity-50" />
-          </Link>
-        </div>
-        {event.actorName && (
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {event.actorName}
-            {event.actorEmail && (
-              <span className="text-muted-foreground/70"> · {event.actorEmail}</span>
+      </TableCell>
+      <TableCell className="py-2.5 max-w-[200px]">
+        <Link
+          href={`/documents/${event.documentId}`}
+          className="hover:text-primary hover:underline text-sm font-medium flex items-center gap-1 truncate"
+        >
+          <span className="truncate">{event.documentTitle}</span>
+          <ExternalLink className="h-3 w-3 shrink-0 opacity-40" />
+        </Link>
+        {(event as ExtendedAuditEvent).uploaderName && (
+          <div className="text-xs text-muted-foreground truncate mt-0.5">
+            by {(event as ExtendedAuditEvent).uploaderName}
+            {(event as ExtendedAuditEvent).uploaderEmail && (
+              <span className="opacity-70"> · {(event as ExtendedAuditEvent).uploaderEmail}</span>
             )}
           </div>
         )}
-      </div>
-
-      <div className="shrink-0 text-right">
-        {event.ipAddress && (
-          <div className="text-xs font-mono text-muted-foreground mb-0.5">{event.ipAddress}</div>
+      </TableCell>
+      <TableCell className="py-2.5">
+        {event.actorName ? (
+          <div>
+            <div className="text-sm font-medium">{event.actorName}</div>
+            {event.actorEmail && (
+              <div className="text-xs text-muted-foreground">{event.actorEmail}</div>
+            )}
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
         )}
-        <time
-          className="text-xs text-muted-foreground"
-          title={absolute}
-        >
-          {relative}
-        </time>
-      </div>
-    </div>
+      </TableCell>
+      <TableCell className="py-2.5">
+        {event.ipAddress ? (
+          <span className="text-xs font-mono text-muted-foreground">{event.ipAddress.split(",")[0].trim()}</span>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        )}
+      </TableCell>
+      <TableCell className="py-2.5">
+        {(event as ExtendedAuditEvent).note && (
+          <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-1 max-w-[180px] truncate" title={(event as ExtendedAuditEvent).note ?? ""}>
+            {(event as ExtendedAuditEvent).note}
+          </div>
+        )}
+      </TableCell>
+      <TableCell className="py-2.5 text-right">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <time className="text-xs text-muted-foreground cursor-default">{relative}</time>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p className="text-xs">{absolute}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function EventTable({ events, isLoading, emptyMessage }: { events: ExtendedAuditEvent[]; isLoading: boolean; emptyMessage?: string }) {
+  if (isLoading) {
+    return <div className="p-12 text-center text-muted-foreground text-sm">Loading audit log…</div>;
+  }
+  if (events.length === 0) {
+    return <div className="p-12 text-center text-muted-foreground text-sm">{emptyMessage ?? "No events match your filter."}</div>;
+  }
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead className="w-44">Event</TableHead>
+          <TableHead>Document</TableHead>
+          <TableHead>Actor</TableHead>
+          <TableHead className="w-32">IP Address</TableHead>
+          <TableHead>Note</TableHead>
+          <TableHead className="text-right w-28">When</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {events.map(event => (
+          <AuditRow key={event.id} event={event} />
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
 export function AdminAuditPage() {
-  const { data, isLoading, refetch } = useGetAdminAuditLog();
+  const { data, isLoading, refetch, isFetching } = useGetAdminAuditLog();
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
 
-  const events = data?.events ?? [];
+  const events = (data?.events ?? []) as ExtendedAuditEvent[];
 
-  const filtered = events.filter(e => {
-    const matchesType = typeFilter === "all" || e.type === typeFilter;
-    const term = search.toLowerCase();
-    const matchesSearch =
-      !term ||
-      e.documentTitle.toLowerCase().includes(term) ||
-      (e.actorName ?? "").toLowerCase().includes(term) ||
-      (e.actorEmail ?? "").toLowerCase().includes(term) ||
-      (e.ipAddress ?? "").includes(term);
-    return matchesType && matchesSearch;
-  });
+  const filterEvents = (tab: string) => {
+    const tabTypes = TAB_TYPES[tab] ?? [];
+    return events.filter(e => {
+      const matchesTab = tabTypes.length === 0 || tabTypes.includes(e.type);
+      const term = search.toLowerCase();
+      const matchesSearch =
+        !term ||
+        e.documentTitle.toLowerCase().includes(term) ||
+        (e.actorName ?? "").toLowerCase().includes(term) ||
+        (e.actorEmail ?? "").toLowerCase().includes(term) ||
+        (e.ipAddress ?? "").includes(term) ||
+        ((e as ExtendedAuditEvent).uploaderName ?? "").toLowerCase().includes(term) ||
+        ((e as ExtendedAuditEvent).uploaderEmail ?? "").toLowerCase().includes(term);
+      return matchesTab && matchesSearch;
+    });
+  };
+
+  const tabCount = (tab: string) => {
+    if (isLoading) return "";
+    const count = filterEvents(tab).length;
+    return ` (${count})`;
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <ClipboardList className="h-6 w-6 text-primary" />
@@ -143,61 +227,89 @@ export function AdminAuditPage() {
             All document and signing activity across your organisation
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void refetch()}>
-          Refresh
-        </Button>
-      </div>
-
-      <div className="flex gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search document, person, or IP…"
-            className="pl-9"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void refetch()}
+            disabled={isFetching}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+          >
+            <a href="/api/admin/audit/export" download>
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+              Export CSV
+            </a>
+          </Button>
         </div>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="All events" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All events</SelectItem>
-            <SelectItem value="uploaded">Uploaded</SelectItem>
-            <SelectItem value="sent">Sent for signing</SelectItem>
-            <SelectItem value="viewed">Viewed</SelectItem>
-            <SelectItem value="signed">Signed</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-medium">
-            {isLoading ? "Loading…" : `${filtered.length} event${filtered.length !== 1 ? "s" : ""}`}
-          </CardTitle>
-          <CardDescription>
-            Most recent activity first · up to 1 000 events stored
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-10 text-center text-muted-foreground">Loading audit log…</div>
-          ) : filtered.length === 0 ? (
-            <div className="p-10 text-center text-muted-foreground">
-              {events.length === 0 ? "No activity yet." : "No events match your filter."}
-            </div>
-          ) : (
-            <ScrollArea className="h-[600px]">
-              {filtered.map(event => (
-                <AuditRow key={event.id} event={event} />
-              ))}
-            </ScrollArea>
-          )}
-        </CardContent>
-      </Card>
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search document, person, or IP…"
+          className="pl-9"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="all">
+        <TabsList>
+          <TabsTrigger value="all" className="gap-1.5">
+            <ClipboardList className="h-3.5 w-3.5" />
+            All{tabCount("all")}
+          </TabsTrigger>
+          <TabsTrigger value="documents" className="gap-1.5">
+            <FileText className="h-3.5 w-3.5" />
+            Documents{tabCount("documents")}
+          </TabsTrigger>
+          <TabsTrigger value="signing" className="gap-1.5">
+            <Users className="h-3.5 w-3.5" />
+            Signing{tabCount("signing")}
+          </TabsTrigger>
+          <TabsTrigger value="review" className="gap-1.5">
+            <CheckCheck className="h-3.5 w-3.5" />
+            Review{tabCount("review")}
+          </TabsTrigger>
+        </TabsList>
+
+        {(["all", "documents", "signing", "review"] as const).map(tab => {
+          const filtered = filterEvents(tab);
+          return (
+            <TabsContent key={tab} value={tab} className="mt-4">
+              <Card className="overflow-hidden">
+                <CardHeader className="pb-3 border-b">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {isLoading ? "Loading…" : `${filtered.length} event${filtered.length !== 1 ? "s" : ""}`}
+                  </CardTitle>
+                  <CardDescription>
+                    {tab === "all" && "All activity · most recent first · up to 1 000 events"}
+                    {tab === "documents" && "Uploads, sends and completions"}
+                    {tab === "signing" && "Document views and signatures collected"}
+                    {tab === "review" && "Reviewer approvals and change requests"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <EventTable
+                    events={filtered}
+                    isLoading={isLoading}
+                    emptyMessage={events.length === 0 ? "No activity yet." : "No events match your search."}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          );
+        })}
+      </Tabs>
     </div>
   );
 }
