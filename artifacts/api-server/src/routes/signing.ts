@@ -348,7 +348,16 @@ router.post("/sign/:token/review", async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ success: true });
+    // Re-fetch all recipients to compute accurate nextStep after the update
+    const allRecipientsAfter = await db
+      .select()
+      .from(recipientsTable)
+      .where(eq(recipientsTable.documentId, r.documentId));
+
+    const updatedRecipient = allRecipientsAfter.find((x) => x.token === token)!;
+    const nextStep = computeNextStep(updatedRecipient, allRecipientsAfter);
+
+    res.json({ success: true, nextStep, requiresSignature: r.requiresSignature });
   } catch (err) {
     req.log.error({ err }, "submit review error");
     res.status(500).json({ error: "Internal server error" });

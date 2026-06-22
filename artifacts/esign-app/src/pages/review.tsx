@@ -44,6 +44,7 @@ export function ReviewPage() {
   const [note, setNote] = useState("");
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [postReviewNextStep, setPostReviewNextStep] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [decision, setDecision] = useState<"approve" | "request_changes" | null>(null);
 
@@ -92,6 +93,7 @@ export function ReviewPage() {
         throw new Error(data.error || "Failed to submit review");
       }
       setSubmitted(true);
+      if (data.nextStep) setPostReviewNextStep(data.nextStep);
       toast({
         title: d === "approve" ? "Document Approved" : "Changes Requested",
         description: d === "approve"
@@ -150,9 +152,23 @@ export function ReviewPage() {
                   <CheckCircle2 className="h-8 w-8 text-green-600" />
                 </div>
                 <h2 className="text-xl font-bold">Document Approved</h2>
-                <p className="text-muted-foreground max-w-sm">
-                  You have approved <strong>{info?.documentTitle}</strong>. The signing process will continue once all reviewers have approved.
-                </p>
+                {postReviewNextStep === "sign" ? (
+                  <>
+                    <p className="text-muted-foreground max-w-sm">
+                      You approved <strong>{info?.documentTitle}</strong>. You also need to sign it — click below to proceed.
+                    </p>
+                    <a
+                      href={`/sign/${token}`}
+                      className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                      Sign Document →
+                    </a>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground max-w-sm">
+                    You have approved <strong>{info?.documentTitle}</strong>. The signing process will continue once all reviewers have approved.
+                  </p>
+                )}
               </>
             ) : (
               <>
