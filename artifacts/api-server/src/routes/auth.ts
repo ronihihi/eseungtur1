@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { RegisterBody, LoginBody } from "@workspace/api-zod";
 import type { Request, Response } from "express";
+import { authRateLimit } from "../lib/rateLimiters.js";
 
 const router: IRouter = Router();
 
@@ -37,7 +38,7 @@ function parseJwt(token: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(payload, "base64url").toString("utf-8"));
 }
 
-router.post("/auth/register", async (req: Request, res: Response) => {
+router.post("/auth/register", authRateLimit, async (req: Request, res: Response) => {
   try {
     const parsed = RegisterBody.safeParse(req.body);
     if (!parsed.success) {
@@ -73,7 +74,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/auth/login", async (req: Request, res: Response) => {
+router.post("/auth/login", authRateLimit, async (req: Request, res: Response) => {
   try {
     const parsed = LoginBody.safeParse(req.body);
     if (!parsed.success) {
@@ -176,7 +177,7 @@ router.get("/auth/azure-enabled", (_req: Request, res: Response) => {
   res.json({ enabled: azureConfigured() });
 });
 
-router.get("/auth/azure", (req: Request, res: Response) => {
+router.get("/auth/azure", authRateLimit, (req: Request, res: Response) => {
   if (!azureConfigured()) {
     res.status(503).json({ error: "Azure SSO is not configured" });
     return;

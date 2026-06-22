@@ -12,6 +12,7 @@ import { getAppBaseUrl } from "../lib/appUrl.js";
 import { buildSignedPdf, SignerRecord, DocMeta, ReviewerRecord } from "./pdfSigner.js";
 import { downloadFromGcs, streamFromGcs, isGcsPath, uploadToGcs } from "../lib/gcsStorage.js";
 import { createHash } from "crypto";
+import { signingRateLimit } from "../lib/rateLimiters.js";
 
 const router: IRouter = Router();
 
@@ -203,7 +204,7 @@ router.get("/signing/my-requests", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/sign/:token", async (req: Request, res: Response) => {
+router.get("/sign/:token", signingRateLimit, async (req: Request, res: Response) => {
   res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   const token = req.params.token as string;
   try {
@@ -219,6 +220,12 @@ router.get("/sign/:token", async (req: Request, res: Response) => {
     }
 
     const r = recs[0];
+    // Reject if token is past its expiry date
+    if (r.tokenExpiresAt && r.tokenExpiresAt < new Date()) {
+      res.status(410).json({ error: "This signing link has expired" });
+      return;
+    }
+
     const docs = await db.select().from(documentsTable).where(eq(documentsTable.id, r.documentId)).limit(1);
     const doc = docs[0];
 
@@ -286,7 +293,7 @@ router.get("/sign/:token", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/sign/:token/review", async (req: Request, res: Response) => {
+router.post("/sign/:token/review", signingRateLimit, async (req: Request, res: Response) => {
   res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   const token = req.params.token as string;
   try {
@@ -373,7 +380,7 @@ router.post("/sign/:token/review", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/sign/:token", async (req: Request, res: Response) => {
+router.post("/sign/:token", signingRateLimit, async (req: Request, res: Response) => {
   const token = req.params.token as string;
   try {
     const parsed = SubmitSignatureBody.safeParse(req.body);
@@ -568,7 +575,7 @@ router.post("/sign/:token", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/sign/:token/download", async (req: Request, res: Response) => {
+router.get("/sign/:token/download", signingRateLimit, async (req: Request, res: Response) => {
   res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   const token = req.params.token as string;
   try {
@@ -668,7 +675,7 @@ router.get("/sign/:token/download", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/sign/:token/file", async (req: Request, res: Response) => {
+router.get("/sign/:token/file", signingRateLimit, async (req: Request, res: Response) => {
   res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   const token = req.params.token as string;
   try {

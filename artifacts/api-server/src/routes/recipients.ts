@@ -69,6 +69,8 @@ router.post("/documents/:id/recipients", requireAuth, async (req: Request, res: 
           })
           .where(eq(recipientsTable.id, existingRec.id));
       } else {
+        // Token expires 90 days from creation
+        const tokenExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
         await db.insert(recipientsTable).values({
           id: uuidv4(),
           documentId: id,
@@ -81,6 +83,7 @@ router.post("/documents/:id/recipients", requireAuth, async (req: Request, res: 
           requiresSignature,
           reviewStatus: requiresReview ? "pending" : null,
           reviewChecklist: reviewChecklist as null,
+          tokenExpiresAt,
         });
       }
     }

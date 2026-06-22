@@ -22,6 +22,7 @@ export const recipientsTable = pgTable("recipients", {
   reviewedAt: timestamp("reviewed_at"),
   reviewNote: text("review_note"),
   reviewChecklist: jsonb("review_checklist"),
+  tokenExpiresAt: timestamp("token_expires_at"),
 });
 
 export const insertRecipientSchema = createInsertSchema(recipientsTable).omit({
