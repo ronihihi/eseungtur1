@@ -939,7 +939,7 @@ export function DocumentDetailPage() {
                         reviewStatus?: string;
                         reviewNote?: string | null;
                       };
-                      const hasNote = rExt.reviewStatus === "changes_requested" && rExt.reviewNote;
+                      const hasNote = (rExt.reviewStatus === "changes_requested" || rExt.reviewStatus === "approved") && rExt.reviewNote;
                       const statusDate = recipient.signedAt ?? recipient.viewedAt;
                       const formattedDate = statusDate ? format(new Date(statusDate), "MMM d, h:mm a") : null;
                       return (
@@ -1021,9 +1021,9 @@ export function DocumentDetailPage() {
 
                           {/* Note footer */}
                           {hasNote && (
-                            <div className="border-t border-amber-200 bg-amber-50 px-3 py-2 flex gap-2">
-                              <MessageSquare className="h-3.5 w-3.5 shrink-0 mt-px text-amber-500" />
-                              <p className="text-xs text-amber-800 whitespace-pre-wrap break-words leading-relaxed">{rExt.reviewNote}</p>
+                            <div className={`border-t px-3 py-2 flex gap-2 ${rExt.reviewStatus === "approved" ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}`}>
+                              <MessageSquare className={`h-3.5 w-3.5 shrink-0 mt-px ${rExt.reviewStatus === "approved" ? "text-green-500" : "text-amber-500"}`} />
+                              <p className={`text-xs whitespace-pre-wrap break-words leading-relaxed ${rExt.reviewStatus === "approved" ? "text-green-800" : "text-amber-800"}`}>{rExt.reviewNote}</p>
                             </div>
                           )}
                         </div>
