@@ -558,6 +558,23 @@ export function SignPage() {
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)}>
                   <CardContent className="space-y-5 pt-5">
+                    {/* Reviewer notes */}
+                    {(() => {
+                      const reviewers = (data as { approvedReviewers?: Array<{ name: string; note?: string | null }> }).approvedReviewers ?? [];
+                      const withNotes = reviewers.filter((r) => r.note);
+                      if (withNotes.length === 0) return null;
+                      return (
+                        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 space-y-2">
+                          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Reviewer Notes</p>
+                          {withNotes.map((r, i) => (
+                            <div key={i} className="text-xs text-blue-900">
+                              <span className="font-medium">{r.name}:</span>{" "}
+                              <span className="whitespace-pre-wrap">{r.note}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                     {/* Full name */}
                     <FormField
                       control={form.control}

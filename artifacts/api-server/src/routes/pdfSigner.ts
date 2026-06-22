@@ -352,8 +352,8 @@ async function addAuditPage(
   // ── Review Record (only if reviewers were involved) ─────────────────────────
   if (reviewers && reviewers.length > 0) {
     sectionLabel("REVIEW RECORD");
-    const rvColX = [margin, margin + 115, margin + 255, margin + 350, margin + 440];
-    const rvHeaders = ["REVIEWER NAME", "EMAIL ADDRESS", "REVIEWED AT (UTC)", "DECISION", "NOTE"];
+    const rvColX = [margin, margin + 130, margin + 280, margin + 390];
+    const rvHeaders = ["REVIEWER NAME", "EMAIL ADDRESS", "REVIEWED AT (UTC)", "DECISION"];
     const rowH = 18;
 
     page.drawRectangle({ x: margin, y: y - rowH + 5, width: contentW, height: rowH, color: lightBlue });
@@ -362,15 +362,13 @@ async function addAuditPage(
     });
     y -= rowH;
 
-    for (const [i, rv] of reviewers.entries()) {
-      if (i % 2 === 1) {
-        page.drawRectangle({ x: margin, y: y - rowH + 5, width: contentW, height: rowH, color: rgb(0.97, 0.97, 0.97) });
-      }
+    for (const rv of reviewers) {
+      // Main reviewer row
       const decisionText = rv.decision === "approved" ? "APPROVED" : "CHANGES REQUESTED";
       const decisionColor = rv.decision === "approved" ? successGreen : rgb(0.75, 0.2, 0.1);
       const cells = [
-        truncate(rv.name, 18),
-        truncate(rv.email, 24),
+        truncate(rv.name, 22),
+        truncate(rv.email, 26),
         fmtDateTime(rv.reviewedAt),
       ];
       cells.forEach((c, ci) => {
@@ -378,10 +376,20 @@ async function addAuditPage(
         page.drawText(c, { x: rvColX[ci] + 3, y: y - 3, size: 7.5, font: cellFont, color: darkText });
       });
       page.drawText(decisionText, { x: rvColX[3] + 3, y: y - 3, size: 7.5, font: fontBold, color: decisionColor });
-      if (rv.note) {
-        page.drawText(truncate(rv.note, 14), { x: rvColX[4] + 3, y: y - 3, size: 7.5, font, color: darkText });
-      }
       y -= rowH;
+
+      // Note sub-row (full width) if present
+      if (rv.note) {
+        const notePrefix = "Note: ";
+        const maxNoteChars = 110;
+        const noteText = notePrefix + (rv.note.length > maxNoteChars ? rv.note.slice(0, maxNoteChars - 1) + "\u2026" : rv.note);
+        const noteH = 16;
+        page.drawRectangle({ x: margin, y: y - noteH + 5, width: contentW, height: noteH, color: rgb(1.0, 0.98, 0.92) });
+        const noteFont = selectFont(rv.note, font, fontArabic);
+        page.drawText(noteText, { x: margin + 6, y: y - 4, size: 7.5, font: noteFont, color: rgb(0.45, 0.28, 0.0) });
+        y -= noteH;
+      }
+
       page.drawLine({
         start: { x: margin, y: y + 5 }, end: { x: pw - margin, y: y + 5 },
         thickness: 0.3, color: lineGray,

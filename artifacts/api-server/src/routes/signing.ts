@@ -255,6 +255,7 @@ router.get("/sign/:token", async (req: Request, res: Response) => {
         name: x.signerName || x.teamName,
         teamName: x.teamName,
         reviewedAt: x.reviewedAt?.toISOString() ?? new Date().toISOString(),
+        note: x.reviewNote ?? null,
       }));
 
     res.json({
