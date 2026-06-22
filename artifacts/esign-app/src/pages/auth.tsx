@@ -188,7 +188,7 @@ export function AuthPage() {
               <>
                 <Button type="button" variant="outline" className="w-full h-10" onClick={handleMicrosoftSignIn}>
                   <MicrosoftIcon />
-                  Sign in with Microsoft
+                  {isLogin ? "Sign in with Microsoft" : "Sign up with Microsoft"}
                 </Button>
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">

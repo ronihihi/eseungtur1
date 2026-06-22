@@ -93,10 +93,21 @@ export function Layout({ children }: LayoutProps) {
                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                <div className="px-2 py-1.5">
+              <DropdownMenuContent align="end" className="w-52">
+                <div className="px-2 py-1.5 space-y-1">
                   <p className="text-xs font-medium text-foreground truncate">{me?.user?.name}</p>
                   <p className="text-xs text-muted-foreground truncate">{me?.user?.email}</p>
+                  <div className="pt-0.5">
+                    {me?.user?.role === "admin" && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">Admin</span>
+                    )}
+                    {me?.user?.role === "auditor" && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-700 border border-teal-200">Auditor</span>
+                    )}
+                    {me?.user?.role === "user" && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground border">User</span>
+                    )}
+                  </div>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive gap-2">
