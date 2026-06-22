@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "wouter";
 import { CheckCircle2, XCircle, Eye, Clock, Loader2, FileText } from "lucide-react";
 
@@ -48,7 +48,7 @@ export function ReviewPage() {
   const [submitted, setSubmitted] = useState(false);
   const [decision, setDecision] = useState<"approve" | "request_changes" | null>(null);
 
-  const pdfUrl = token ? { url: `/api/sign/${token}/file`, withCredentials: false } : null;
+  const pdfUrl = useMemo(() => token ? { url: `/api/sign/${token}/file`, withCredentials: false } : null, [token]);
 
   useEffect(() => {
     if (!token) return;
