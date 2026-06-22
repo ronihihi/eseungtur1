@@ -55,6 +55,7 @@ export function SignPage() {
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [sigDialogOpen, setSigDialogOpen] = useState(false);
   const [tempSig, setTempSig] = useState("");
+  const [sigFromExternal, setSigFromExternal] = useState(false); // true = saved/dialog sig; false = drawn
   const sigPadSectionRef = useRef<HTMLDivElement>(null);
   const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
   const [activeFieldId, setActiveFieldId] = useState<string | null>(null);
@@ -147,6 +148,7 @@ export function SignPage() {
     if (savedSigData?.signatureData) {
       form.setValue("signatureData", savedSigData.signatureData);
       form.clearErrors("signatureData");
+      setSigFromExternal(true);
       toast({ title: "Saved signature applied" });
     }
   };
@@ -155,6 +157,7 @@ export function SignPage() {
     if (!tempSig) return;
     form.setValue("signatureData", tempSig);
     form.clearErrors("signatureData");
+    setSigFromExternal(true);
     setSigDialogOpen(false);
     setTempSig("");
     sigPadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -650,7 +653,7 @@ export function SignPage() {
                               </div>
                               <FormControl>
                                 <div className={`rounded-lg transition-colors ${form.formState.errors.signatureData ? "ring-2 ring-destructive ring-offset-2" : ""}`}>
-                                  {signatureData && signatureData.startsWith("data:image") ? (
+                                  {sigFromExternal && signatureData && signatureData.startsWith("data:image") ? (
                                     <div className="border rounded-lg bg-white p-2 flex flex-col items-center gap-2">
                                       <img src={signatureData} alt="Signature preview" className="max-h-24 object-contain" />
                                       <Button
@@ -658,15 +661,15 @@ export function SignPage() {
                                         variant="ghost"
                                         size="sm"
                                         className="text-xs text-muted-foreground"
-                                        onClick={() => field.onChange("")}
+                                        onClick={() => { field.onChange(""); setSigFromExternal(false); }}
                                       >
                                         Clear & redraw
                                       </Button>
                                     </div>
                                   ) : (
                                     <SignaturePad
-                                      onSign={(sig) => { field.onChange(sig); form.clearErrors("signatureData"); }}
-                                      onClear={() => field.onChange("")}
+                                      onSign={(sig) => { field.onChange(sig); form.clearErrors("signatureData"); setSigFromExternal(false); }}
+                                      onClear={() => { field.onChange(""); setSigFromExternal(false); }}
                                     />
                                   )}
                                 </div>
