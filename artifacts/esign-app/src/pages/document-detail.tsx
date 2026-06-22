@@ -934,64 +934,89 @@ export function DocumentDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {recipients.map((recipient, idx) => (
-                      <div key={recipient.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {doc.signingOrder === "sequential" && (
-                            <div
-                              className="h-5 w-5 shrink-0 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
-                              style={{ background: RECIPIENT_COLORS[idx % RECIPIENT_COLORS.length].border }}
-                            >
-                              {idx + 1}
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm font-medium truncate">{recipient.teamName}</div>
-                            <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                              <Mail className="h-3 w-3 shrink-0" />{recipient.email}
-                            </div>
-                            {recipient.signerName && (
-                              <div className="text-xs text-muted-foreground">Signed by {recipient.signerName}</div>
+                    {recipients.map((recipient, idx) => {
+                      const rExt = recipient as {
+                        reviewStatus?: string;
+                        reviewNote?: string | null;
+                      };
+                      const hasNote = rExt.reviewStatus === "changes_requested" && rExt.reviewNote;
+                      const statusDate = recipient.signedAt ?? recipient.viewedAt;
+                      const formattedDate = statusDate ? format(new Date(statusDate), "MMM d, h:mm a") : null;
+                      return (
+                        <div key={recipient.id} className="rounded-lg border overflow-hidden">
+                          {/* Main row */}
+                          <div className="flex items-start gap-2.5 p-3">
+                            {/* Sequential number */}
+                            {doc.signingOrder === "sequential" && (
+                              <div
+                                className="h-5 w-5 mt-0.5 shrink-0 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                                style={{ background: RECIPIENT_COLORS[idx % RECIPIENT_COLORS.length].border }}
+                              >
+                                {idx + 1}
+                              </div>
                             )}
-                            {(recipient as { reviewStatus?: string; reviewNote?: string | null }).reviewStatus === "changes_requested" &&
-                              (recipient as { reviewNote?: string | null }).reviewNote && (
-                                <div className="mt-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 flex gap-1.5">
-                                  <MessageSquare className="h-3.5 w-3.5 shrink-0 mt-px text-amber-500" />
-                                  <span className="whitespace-pre-wrap break-words">{(recipient as { reviewNote?: string | null }).reviewNote}</span>
+
+                            {/* Info block */}
+                            <div className="flex-1 min-w-0 space-y-0.5">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-semibold">{recipient.teamName}</span>
+                                <RecipientStatusBadge status={recipient.status} />
+                              </div>
+                              <div className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                                <Mail className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{recipient.email}</span>
+                              </div>
+                              {recipient.signerName && (
+                                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <PenLine className="h-3 w-3 shrink-0" />
+                                  Signed by <strong className="font-medium text-foreground">{recipient.signerName}</strong>
                                 </div>
                               )}
+                              {formattedDate && (
+                                <div className="text-[11px] text-muted-foreground/70">{formattedDate}</div>
+                              )}
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                title="Copy signing link"
+                                onClick={() => handleCopyLink(recipient.token)}
+                              >
+                                {copiedLink === recipient.token ? (
+                                  <Check className="h-3.5 w-3.5 text-green-500" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                              </Button>
+                              {recipient.status !== "signed" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Send reminder"
+                                  onClick={() => handleRemind(recipient.id)}
+                                  disabled={remindMutation.isPending}
+                                >
+                                  <BellRing className="h-3.5 w-3.5 text-muted-foreground" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <RecipientStatusBadge status={recipient.status} date={recipient.signedAt ?? recipient.viewedAt} />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            title="Copy signing link"
-                            onClick={() => handleCopyLink(recipient.token)}
-                          >
-                            {copiedLink === recipient.token ? (
-                              <Check className="h-3 w-3 text-green-500" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </Button>
-                          {recipient.status !== "signed" && (
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="h-7 w-7"
-                              title="Send reminder"
-                              onClick={() => handleRemind(recipient.id)}
-                              disabled={remindMutation.isPending}
-                            >
-                              <BellRing className="h-3 w-3" />
-                            </Button>
+
+                          {/* Note footer */}
+                          {hasNote && (
+                            <div className="border-t border-amber-200 bg-amber-50 px-3 py-2 flex gap-2">
+                              <MessageSquare className="h-3.5 w-3.5 shrink-0 mt-px text-amber-500" />
+                              <p className="text-xs text-amber-800 whitespace-pre-wrap break-words leading-relaxed">{rExt.reviewNote}</p>
+                            </div>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
