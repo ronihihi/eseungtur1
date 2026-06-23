@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const ACCEPTED_TYPES = [".pdf", ".docx", ".doc"];
 const ACCEPTED_MIME = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"];
@@ -265,6 +266,18 @@ export function UploadPage() {
               )}
             </div>
           </div>
+
+          {/* DOCX fidelity notice */}
+          {file && (file.name.toLowerCase().endsWith(".docx") || file.name.toLowerCase().endsWith(".doc")) && (
+            <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40">
+              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+              <AlertDescription className="text-amber-800 dark:text-amber-300 text-sm">
+                Word documents are auto-converted to PDF. Complex layouts — especially Arabic text, multi-column tables, or custom fonts — may look different after conversion.{" "}
+                <strong>For exact formatting, export your document as PDF from Word first</strong>{" "}
+                (File → Save As → PDF) and upload that instead.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Upload progress */}
           {isUploading && (

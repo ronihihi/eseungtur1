@@ -47,12 +47,14 @@ async function convertDocxToPdf(inputPath: string, outputDir: string): Promise<s
       [
         "--headless",
         "--norestore",
+        "--nofirststartwizard",
         `-env:UserInstallation=file://${tmpProfile}`,
-        "--convert-to", "pdf",
+        "--infilter=Microsoft Word 2007-2019 XML (.docx)",
+        "--convert-to", "pdf:writer_pdf_Export",
         "--outdir", outputDir,
         inputPath,
       ],
-      { env: { ...process.env, HOME: "/tmp" }, timeout: 60_000 }
+      { env: { ...process.env, HOME: "/tmp", LANG: "en_US.UTF-8" }, timeout: 60_000 }
     );
     const baseName = path.basename(inputPath, path.extname(inputPath));
     return path.join(outputDir, baseName + ".pdf");
