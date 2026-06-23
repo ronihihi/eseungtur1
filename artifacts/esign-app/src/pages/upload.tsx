@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { Upload, FileText, ArrowLeft, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, FileText, ArrowLeft, X, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 
 import { useToast } from "@/hooks/use-toast";
@@ -14,10 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-
-const ACCEPTED_TYPES = [".pdf", ".docx", ".doc"];
-const ACCEPTED_MIME = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"];
+const ACCEPTED_TYPES = [".pdf"];
+const ACCEPTED_MIME = ["application/pdf"];
 const MAX_MB = 50;
 
 const uploadSchema = z.object({
@@ -54,7 +52,7 @@ export function UploadPage() {
     setDragError("");
     const ext = "." + f.name.split(".").pop()?.toLowerCase();
     if (!ACCEPTED_TYPES.includes(ext) && !ACCEPTED_MIME.includes(f.type)) {
-      setDragError("Only PDF, DOC, and DOCX files are supported.");
+      setDragError("Only PDF files are supported.");
       return;
     }
     if (f.size > MAX_MB * 1024 * 1024) {
@@ -162,13 +160,10 @@ export function UploadPage() {
       }, 300);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "";
-      const isReadError = msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("could not be read") || msg.toLowerCase().includes("failed to read");
       toast({
         variant: "destructive",
         title: "Upload failed",
-        description: isReadError
-          ? "The file could not be read. If it is open in Microsoft Word or another application, please close it and try again."
-          : msg || "An unexpected error occurred.",
+        description: msg || "An unexpected error occurred.",
       });
       setUploadProgress(0);
     } finally {
@@ -188,7 +183,7 @@ export function UploadPage() {
           </Button>
         </Link>
         <h1 className="text-2xl font-bold tracking-tight">Upload Document</h1>
-        <p className="text-muted-foreground mt-1">Upload a PDF or Word document to start collecting signatures.</p>
+        <p className="text-muted-foreground mt-1">Upload a PDF document to start collecting signatures.</p>
       </div>
 
       <Form {...form}>
@@ -212,7 +207,7 @@ export function UploadPage() {
           >
             <input
               type="file"
-              accept=".pdf,.docx,.doc,application/pdf"
+              accept=".pdf,application/pdf"
               className="hidden"
               ref={fileInputRef}
               onChange={handleFileChange}
@@ -244,7 +239,7 @@ export function UploadPage() {
               ) : dragError ? (
                 <>
                   <div className="h-14 w-14 rounded-2xl bg-destructive/10 flex items-center justify-center">
-                    <AlertCircle className="h-7 w-7 text-destructive" />
+                    <X className="h-7 w-7 text-destructive" />
                   </div>
                   <div className="space-y-1">
                     <p className="font-medium text-destructive">{dragError}</p>
@@ -260,24 +255,12 @@ export function UploadPage() {
                     <p className="font-semibold text-foreground">
                       {isDragging ? "Drop your file here" : "Click to browse or drag & drop"}
                     </p>
-                    <p className="text-sm text-muted-foreground">PDF, DOCX or DOC · up to {MAX_MB} MB</p>
+                    <p className="text-sm text-muted-foreground">PDF · up to {MAX_MB} MB</p>
                   </div>
                 </>
               )}
             </div>
           </div>
-
-          {/* DOCX fidelity notice */}
-          {file && (file.name.toLowerCase().endsWith(".docx") || file.name.toLowerCase().endsWith(".doc")) && (
-            <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40">
-              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-              <AlertDescription className="text-amber-800 dark:text-amber-300 text-sm">
-                Word documents are auto-converted to PDF. Complex layouts — especially Arabic text, multi-column tables, or custom fonts — may look different after conversion.{" "}
-                <strong>For exact formatting, export your document as PDF from Word first</strong>{" "}
-                (File → Save As → PDF) and upload that instead.
-              </AlertDescription>
-            </Alert>
-          )}
 
           {/* Upload progress */}
           {isUploading && (
@@ -288,11 +271,7 @@ export function UploadPage() {
                     <span className="flex items-center gap-1.5 text-green-600">
                       <CheckCircle2 className="h-4 w-4" /> Upload complete
                     </span>
-                  ) : uploadProgress >= 80 && file && (file.name.toLowerCase().endsWith(".docx") || file.name.toLowerCase().endsWith(".doc")) ? (
-                    "Converting Word document to PDF…"
-                  ) : (
-                    "Uploading…"
-                  )}
+                  ) : "Uploading…"}
                 </span>
                 <span className="font-medium tabular-nums">{uploadProgress}%</span>
               </div>

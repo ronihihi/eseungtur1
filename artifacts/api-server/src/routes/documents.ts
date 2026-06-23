@@ -1,10 +1,7 @@
 import { Router, type IRouter } from "express";
 import path from "path";
 import fs from "fs";
-import os from "os";
 import { fileURLToPath } from "url";
-import { execFile } from "child_process";
-import { promisify } from "util";
 import { v4 as uuidv4 } from "uuid";
 import multer from "multer";
 import { eq, and } from "drizzle-orm";
@@ -12,70 +9,6 @@ import { db, documentsTable, recipientsTable, signatureFieldsTable } from "@work
 import type { Request, Response } from "express";
 import { buildSignedPdf, SignerRecord, ReviewerRecord, DocMeta } from "./pdfSigner.js";
 import { uploadToGcs, downloadFromGcs, streamFromGcs, isGcsPath } from "../lib/gcsStorage.js";
-
-const execFileAsync = promisify(execFile);
-
-const SOFFICE_STATIC_CANDIDATES = [
-  "soffice",
-  "/usr/bin/soffice",
-  "/usr/lib/libreoffice/program/soffice",
-];
-
-let _sofficeCache: string | null = null;
-
-async function findSoffice(): Promise<string> {
-  if (_sofficeCache) return _sofficeCache;
-
-  // Dynamically scan the Nix store for any LibreOffice wrapped binary —
-  // the hash prefix changes whenever Nix rebuilds the package.
-  const nixCandidates: string[] = [];
-  try {
-    const nixStore = "/nix/store";
-    const entries = fs.readdirSync(nixStore);
-    for (const entry of entries) {
-      if (entry.includes("libreoffice") && entry.includes("wrapped")) {
-        nixCandidates.push(path.join(nixStore, entry, "bin", "soffice"));
-      }
-    }
-  } catch {
-    // /nix/store not available — skip
-  }
-
-  for (const candidate of [...SOFFICE_STATIC_CANDIDATES, ...nixCandidates]) {
-    try {
-      await execFileAsync(candidate, ["--version"], { timeout: 5_000 });
-      _sofficeCache = candidate;
-      return candidate;
-    } catch {
-      continue;
-    }
-  }
-  throw new Error("LibreOffice is not available in this environment. Please upload a PDF file instead.");
-}
-
-async function convertDocxToPdf(inputPath: string, outputDir: string): Promise<string> {
-  const soffice = await findSoffice();
-  const tmpProfile = path.join(os.tmpdir(), `lo-profile-${uuidv4()}`);
-  try {
-    await execFileAsync(
-      soffice,
-      [
-        "--headless",
-        "--norestore",
-        "--nofirststartwizard",
-        `-env:UserInstallation=file://${tmpProfile}`,
-        "--convert-to", "pdf",
-        "--outdir", outputDir,
-        inputPath,
-      ],
-      { env: { ...process.env, HOME: "/tmp" }, timeout: 60_000 }
-    );
-    const baseName = path.basename(inputPath, path.extname(inputPath));
-    return path.join(outputDir, baseName + ".pdf");
-  } finally {
-    fs.rmSync(tmpProfile, { recursive: true, force: true });
-  }
-}
 
 const router: IRouter = Router();
 
@@ -134,10 +67,9 @@ const multerUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter(_req, file, cb) {
-    const allowed = [".pdf", ".docx", ".doc"];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) cb(null, true);
-    else cb(new Error("Only PDF and Word documents are allowed"));
+    if (ext === ".pdf") cb(null, true);
+    else cb(new Error("Only PDF files are allowed"));
   },
 });
 
@@ -152,30 +84,9 @@ router.post("/documents", requireAuth, multerUpload.single("file"), async (req: 
     }
 
     const fileName = uploadedFile.originalname;
-    const ext = path.extname(fileName).toLowerCase();
-    let pdfBuffer: Buffer = uploadedFile.buffer;
-    let finalFilename = fileName;
+    const pdfBuffer: Buffer = uploadedFile.buffer;
 
-    if (ext === ".docx" || ext === ".doc") {
-      const tmpDir = os.tmpdir();
-      const tmpInput = path.join(tmpDir, `upload-${uuidv4()}${ext}`);
-      fs.writeFileSync(tmpInput, pdfBuffer);
-      try {
-        const pdfPath = await convertDocxToPdf(tmpInput, tmpDir);
-        pdfBuffer = fs.readFileSync(pdfPath);
-        fs.unlinkSync(pdfPath);
-        finalFilename = path.basename(fileName, ext) + ".pdf";
-        req.log.info({ originalName: fileName }, "converted DOCX to PDF");
-      } catch (convErr) {
-        const msg = convErr instanceof Error ? convErr.message : "Could not convert Word document to PDF.";
-        res.status(500).json({ error: msg });
-        return;
-      } finally {
-        fs.rmSync(tmpInput, { force: true });
-      }
-    }
-
-    // Upload to GCS and save record in parallel prep (GCS upload first, then DB)
+    // Upload to GCS
     const objectName = `documents/${uuidv4()}.pdf`;
     const gcsPath = await uploadToGcs(pdfBuffer, objectName, "application/pdf");
 
@@ -183,7 +94,7 @@ router.post("/documents", requireAuth, multerUpload.single("file"), async (req: 
     await db.insert(documentsTable).values({
       id: newId,
       title: title || fileName,
-      filename: finalFilename,
+      filename: fileName,
       filepath: gcsPath,
       uploadedBy: req.session.userId!,
       uploaderName: req.session.userName!,
