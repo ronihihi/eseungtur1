@@ -130,13 +130,13 @@ export function UploadPage() {
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
-            // Upload transfer: 0–80%; server processing (GCS+DB): 80–100%
+            // Upload transfer: 0–80%; server processing (convert+GCS+DB): 80–95%
             setUploadProgress(Math.round((e.loaded / e.total) * 80));
           }
         };
 
         xhr.onload = () => {
-          setUploadProgress(95);
+          setUploadProgress(90);
           try {
             resolve(JSON.parse(xhr.responseText) as { documentId?: string; error?: string });
           } catch {
@@ -284,10 +284,14 @@ export function UploadPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
-                  {uploadProgress < 100 ? "Uploading…" : (
+                  {uploadProgress >= 100 ? (
                     <span className="flex items-center gap-1.5 text-green-600">
                       <CheckCircle2 className="h-4 w-4" /> Upload complete
                     </span>
+                  ) : uploadProgress >= 80 && file && (file.name.toLowerCase().endsWith(".docx") || file.name.toLowerCase().endsWith(".doc")) ? (
+                    "Converting Word document to PDF…"
+                  ) : (
+                    "Uploading…"
                   )}
                 </span>
                 <span className="font-medium tabular-nums">{uploadProgress}%</span>
